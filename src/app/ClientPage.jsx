@@ -254,56 +254,63 @@ const ClientPage = () => {
     };
 
     const handleSaleScanner = async (scannedId) => {
-        try {
-            const res = await fetch(
-                `https://api.discogs.com/database/search?barcode=${scannedId}`,
-                {
-                    headers: {
-                        Authorization: `Discogs token=${process.env.NEXT_PUBLIC_APP_DISCOGS_API_KEY}`,
-                        "User-Agent": "MyApp/1.0",
-                    }
+    console.log("SALE SCANNER CALLED:", scannedId); // verifică dacă e apelat
+    try {
+        const res = await fetch(
+            `https://api.discogs.com/database/search?barcode=${scannedId}`,
+            {
+                headers: {
+                    Authorization: `Discogs token=${process.env.NEXT_PUBLIC_APP_DISCOGS_API_KEY}`,
+                    "User-Agent": "MyApp/1.0",
                 }
-            );
-            const data = await res.json();
-            if (!data.results?.length) {
-                alert("Produsul nu a fost găsit!");
-                setScanning(false);
-                return;
             }
+        );
+        const data = await res.json();
+        console.log("SALE RESULTS:", data.results); // verifică dacă vine data
 
-            // Verifică fiecare rezultat în DB
-            const resultsWithStatus = await Promise.all(
-                data.results.map(async (item) => {
-                    const snap = await getDoc(doc(db, "releases", String(item.id)));
-                    return {
-                        id: item.id,
-                        title: item.title,
-                        country: item.country || "Necunoscută",
-                        year: item.year,
-                        format: item.formats?.[0]?.name || "",
-                        cover_image: item.cover_image || null,
-                        inInventar: snap.exists(),
-                        ...(snap.exists() ? snap.data() : {})
-                    };
-                })
-            );
-
-            // Dacă e doar unul și e în inventar, mergi direct la modal vânzare
-            const inInventar = resultsWithStatus.filter(r => r.inInventar);
-            if (inInventar.length === 1) {
-                setSaleProduct(inInventar[0]);
-                setSaleQuantity(1);
-            } else {
-                // Arată lista de selecție
-                setSaleResults(resultsWithStatus);
-            }
-
-        } catch (err) {
-            alert("Eroare: " + err.message);
+        if (!data.results?.length) {
+            alert("Produsul nu a fost găsit!");
+            setScanning(false);
+            return;
         }
 
-        setScanning(false);
-    };
+        const resultsWithStatus = await Promise.all(
+            data.results.map(async (item) => {
+                const snap = await getDoc(doc(db, "releases", String(item.id)));
+                console.log(`Item ${item.id} in DB:`, snap.exists()); // verifică DB
+                return {
+                    id: item.id,
+                    title: item.title,
+                    country: item.country || "Necunoscută",
+                    year: item.year,
+                    format: item.formats?.[0]?.name || "",
+                    cover_image: item.cover_image || null,
+                    inInventar: snap.exists(),
+                    ...(snap.exists() ? snap.data() : {})
+                };
+            })
+        );
+
+        console.log("RESULTS WITH STATUS:", resultsWithStatus);
+        console.log("IN INVENTAR:", resultsWithStatus.filter(r => r.inInventar));
+
+        const inInventar = resultsWithStatus.filter(r => r.inInventar);
+        if (inInventar.length === 1) {
+            console.log("Merge direct la modal vanzare");
+            setSaleProduct(inInventar[0]);
+            setSaleQuantity(1);
+        } else {
+            console.log("Arata lista selectie, lungime:", resultsWithStatus.length);
+            setSaleResults(resultsWithStatus);
+        }
+
+    } catch (err) {
+        console.error("EROARE SALE SCANNER:", err);
+        alert("Eroare: " + err.message);
+    }
+
+    setScanning(false);
+};
 
     const handleConfirmSale = async () => {
         if (saleQuantity > saleProduct.stock) {
@@ -332,29 +339,27 @@ const ClientPage = () => {
     return (
         <div className='mainPage'>
 
-
+            {scanning && (
+                <div className="scanner-overlay" onClick={() => setScanning(false)}>
+                    <div className="scanner-view" onClick={(e) => e.stopPropagation()}>
+                        <BarcodeScanner onScan={scanMode === "sale" ? handleSaleScanner : handleScanner} />
+                        <div className="scan-line" />
+                        <p>Aliniați codul de bare în careu</p>
+                    </div>
+                    <button onClick={() => setScanning(false)} className="cancel-scan">
+                        Anulează Scanarea
+                    </button>
+                </div>
+            )}
 
 
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <h1 style={{ marginBottom: '2rem' }}>Gestionare inventar</h1>
                 <div className='topBtns'>
-                    <a className="scan-btn-solid" href='/addproduct' >
+                    <a className="scan-btn-solid" href='/addproduct'>
                         <IoAddCircleOutline size={25} />
-
                         <span>Adauga produse</span>
                     </a>
-                    {scanning && (
-                        <div className="scanner-overlay" onClick={()=>setScanning(false)}>
-                            <div className="scanner-view" onClick={(e)=>e.stopPropagation()}>
-                                <BarcodeScanner onScan={scanMode === "sale" ? handleSaleScanner : handleScanner} />
-                                <div className="scan-line" />
-                                <p>Aliniați codul de bare în careu</p>
-                            </div>
-                            <button onClick={() => setScanning(false)} className="cancel-scan">
-                                Anulează Scanarea
-                            </button>
-                        </div>
-                    )}
                     <button className="scan-btn-solid" style={{ backgroundColor: "#8b0000" }}
                         onClick={() => { setScanMode("sale"); setScanning(true); }}>
                         <CiBarcode size={25} />
@@ -481,6 +486,7 @@ const ClientPage = () => {
                     </div>
                 ))}
             </div>
+            {/* <div style={{color: 'red'}}>{saleProduct ? "SALE PRODUCT SET: " + saleProduct.title : "NULL"}</div> */}
             {saleResults.length > 0 && (
                 <div className="scanbarcodecontainer" onClick={() => setSaleResults([])}>
                     <div className="sale-modal" onClick={(e) => e.stopPropagation()}>

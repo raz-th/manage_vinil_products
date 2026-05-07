@@ -325,6 +325,9 @@ input {
 
 .separator {
     color: #cbd5e1;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    text-align: center;
 }
 
 .not-in-inventory {
@@ -588,6 +591,9 @@ input {
     border: 1px solid #f5c0c0;
     font-size: 0.9rem;
     margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem
 }
 
 .load-more-btn {

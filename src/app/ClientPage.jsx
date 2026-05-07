@@ -7,11 +7,13 @@ import {
 } from 'firebase/firestore';
 
 import "./page.css"
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { CiBarcode } from 'react-icons/ci';
 import { IoAddCircleOutline } from 'react-icons/io5';
 import { MdDelete } from 'react-icons/md';
 import { useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { GrStatusGoodSmall } from 'react-icons/gr';
 
 const PAGE_SIZE = 20;
 
@@ -26,16 +28,43 @@ const ClientPage = () => {
     const [saleResults, setSaleResults] = useState([]);
     const [saleQuantity, setSaleQuantity] = useState(1);
     const [saleProduct, setSaleProduct] = useState(null);
-    const [scanStatus, setScanStatus] = useState(null); // messaj status scanner
+    const [scanStatus, setScanStatus] = useState(null);
     const router = useRouter();
+    const [signedIn, setSignedIn] = useState(false);
 
-    // ── Scanner fizic USB (global keypress buffer) ──
+
     const barcodeBuffer = useRef('');
     const barcodeTimeout = useRef(null);
 
     useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            console.log(auth)
+            if (!user) {
+
+                router.push('/login');
+            } else {
+                const userDocRef = doc(db, "users", user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                if (userDocSnap.exists()) {
+                    if (!userDocSnap.data().isAdmin) {
+                        auth.signOut();
+                        router.push('/login');
+                    }else{
+                        setSignedIn(true)
+                    }
+                } else {
+                    auth.signOut();
+                    router.push('/login');
+                }
+            }
+        });
+
+        return () => unsubscribe();
+    }, [router]);
+
+    useEffect(() => {
         const handleKeyPress = (e) => {
-            // Ignoră dacă e focusat pe un input
+
             const tag = document.activeElement?.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA') return;
 
@@ -322,10 +351,12 @@ const ClientPage = () => {
         }
     };
 
+    if (!signedIn) return null;
+
     return (
         <div className='mainPage'>
 
-        
+
             {scanStatus && (
                 <div className="scan-status">
                     {/* <CiBarcode size={20} /> */}
@@ -354,12 +385,12 @@ const ClientPage = () => {
             {/* indicator mod activ */}
             {scanMode === 'sale' && (
                 <div className="mode-indicator">
-                    🔴 Mod vânzare activ — scanează produsul pentru a înregistra o vânzare
+                    <GrStatusGoodSmall color='red' /> Mod vânzare activ — scanează produsul pentru a înregistra o vânzare
                 </div>
             )}
             {scanMode === 'search' && (
-                <div className="mode-indicator" style={{ background: '#e8f5e9', color: '#2e7d32', borderColor: '#c8e6c9' }}>
-                    🟢 Mod căutare activ — scanează produsul pentru a-l găsi în inventar
+                <div className="mode-indicator" style={{ background: '#e8f5e9', color: '#2e7d32', borderColor: '#c8e6c9'}}>
+                    <GrStatusGoodSmall color='green' /> Mod căutare activ — scanează produsul pentru a-l găsi în inventar
                 </div>
             )}
 

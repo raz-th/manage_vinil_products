@@ -26,6 +26,7 @@
 .mainPage {
     font-family: 'Inter', -apple-system, system-ui, sans-serif;
     padding: 2rem;
+    padding-top: 3rem;
     background-color: #f8fafc;
     min-height: 100vh;
     color: #1e293b;
@@ -345,6 +346,7 @@ input {
     font-size: 1rem;
     transition: background 0.2s;
     flex-shrink: 0;
+
 }
 
 .delete-btn:hover {
@@ -560,6 +562,48 @@ input {
 
 .sale-result-badge {
     flex-shrink: 0;
+}
+
+.scan-status {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    background: #111;
+    color: white;
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    z-index: 9999;
+    animation: fadeIn 0.2s ease;
+}
+
+.mode-indicator {
+    padding: 0.7rem 1rem;
+    border-radius: 8px;
+    background: #fff0f0;
+    color: #8b0000;
+    border: 1px solid #f5c0c0;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+.load-more-btn {
+    width: 100%;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.95rem;
+    margin-top: 1rem;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes scan-anim {

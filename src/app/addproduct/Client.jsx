@@ -43,6 +43,34 @@ export default function Client() {
     const [isScanning, setIsScanning] = useState(false);
     const [countries, setCountries] = useState([]);
 
+    const barcodeBuffer = useRef('');
+    const barcodeTimeout = useRef(null);
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            const tag = document.activeElement?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+            if (e.key === 'Enter') {
+                const code = barcodeBuffer.current.trim();
+                barcodeBuffer.current = '';
+                if (code.length > 3) {
+                    handleScanner(code);
+                }
+                return;
+            }
+
+            barcodeBuffer.current += e.key;
+            clearTimeout(barcodeTimeout.current);
+            barcodeTimeout.current = setTimeout(() => {
+                barcodeBuffer.current = '';
+            }, 100);
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -192,6 +220,12 @@ export default function Client() {
             );
             const data = await res.json();
             const results = data.results;
+
+            if (!results?.length) {
+                setMessage({ type: 'error', text: 'Produsul nu a fost găsit pe Discogs!' });
+                setIsScanning(false);
+                return;
+            }
             const res2 = await fetch(
                 `https://api.discogs.com/releases/${results[0].id}`,
                 {
@@ -291,6 +325,8 @@ export default function Client() {
     };
 
 
+
+
     return (
         <div className="container">
             <div className="form-wrapper">
@@ -325,15 +361,24 @@ export default function Client() {
                                     name="scannedId"
                                     value={formData.scannedId}
                                     onChange={handleChange}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            if (formData.scannedId.trim().length > 3) {
+                                                handleScanner(formData.scannedId.trim());
+                                            }
+                                        }
+                                    }}
                                     placeholder="Scanează sau introdu manual..."
+                                    autoFocus
                                 />
-                                <button
+                                {/* <button
                                     type="button"
                                     onClick={handleScanToggle}
                                     className={`btn-icon ${isScanning ? 'btn-scanning' : 'btn-black'}`}
                                 >
                                     <LucideBarcode size={24} />
-                                </button>
+                                </button> */}
                             </div>
                         </div>
                     </section>

@@ -1,0 +1,265 @@
+.pm-page {
+    min-height: 100vh;
+    background: #f5f5f5;
+    padding: 2rem;
+    color: #000;
+}
+
+.pm-inner {
+    max-width: 800px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.pm-back {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #555;
+    align-self: flex-start;
+    padding: 0;
+}
+
+.pm-back:hover {
+    color: #111;
+}
+
+.pm-header {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.pm-cover {
+    width: 140px;
+    height: 140px;
+    object-fit: cover;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.pm-header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.pm-format {
+    font-size: 0.8rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.pm-header-info h1 {
+    font-size: 1.5rem;
+    margin: 0;
+}
+
+.pm-artist {
+    font-size: 1rem;
+    color: #444;
+    margin: 0;
+}
+
+.pm-meta {
+    display: flex;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.pm-genres {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+}
+
+.pm-tag {
+    padding: 0.2rem 0.6rem;
+    background: #111;
+    color: white;
+    border-radius: 20px;
+    font-size: 0.75rem;
+}
+
+.pm-tag-style {
+    background: #555;
+}
+
+.pm-id {
+    color: #aaa;
+    font-size: 0.75rem;
+}
+
+.pm-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.pm-section {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.pm-section h2 {
+    font-size: 1rem;
+    margin: 0;
+    font-weight: 600;
+}
+
+.pm-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pm-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.pm-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.pm-field label {
+    font-size: 0.82rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.pm-field input {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 0.95rem;
+}
+
+.pm-input-disabled {
+    background: #f5f5f5;
+    color: #888;
+}
+
+.pm-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.pm-oferta-preview {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: #fff8f0;
+    border-radius: 10px;
+    border: 1px solid #f0d9c0;
+}
+
+.pm-pret-vechi {
+    text-decoration: line-through;
+    color: #aaa;
+    font-size: 0.95rem;
+}
+
+.pm-pret-nou {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #111;
+}
+
+.pm-badge-reducere {
+    background: #8b0000;
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.pm-perioada {
+    font-size: 0.8rem;
+    color: #888;
+    margin-left: auto;
+}
+
+.pm-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.pm-delete {
+    padding: 1rem;
+    background: white;
+    color: #8b0000;
+    border: 1px solid #8b0000;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.pm-delete:hover {
+    background: #8b0000;
+    color: white;
+}
+
+.pm-save {
+    padding: 1rem;
+    background: #111;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.pm-save:hover {
+    background: #333;
+}
+
+.pm-save:disabled {
+    background: #aaa;
+    cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+    .pm-page {
+        padding: 1rem;
+    }
+
+    .pm-header {
+        flex-direction: column;
+    }
+
+    .pm-cover {
+        width: 100%;
+        height: 200px;
+    }
+
+    .pm-grid {
+        grid-template-columns: 1fr;
+    }
+}

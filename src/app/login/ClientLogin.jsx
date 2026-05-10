@@ -15,23 +15,34 @@ const Login = () => {
 
     const handleLogin = async (e) => {
         e.preventDefault();
+
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            console.log("Logged in:", userCredential.user);
-            //   alert("Welcome back!");
-            router.push('/')
+
+            await signInWithEmailAndPassword(
+                auth,
+                email,
+                password
+            );
+
+          
+            router.push("/")
+
         } catch (error) {
-            alert(error.message);
+            console.error(error);
         }
     };
 
-    // Google Login
     const handleGoogleLogin = async () => {
+
         try {
-            const result = await signInWithPopup(auth, googleProvider);
-            console.log("Google User:", result.user);
-            
-            router.push('/')
+
+            await signInWithPopup(
+                auth,
+                googleProvider
+            );
+
+           router.push("/")
+
         } catch (error) {
             console.error(error);
         }

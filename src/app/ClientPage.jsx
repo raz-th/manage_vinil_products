@@ -36,6 +36,24 @@ const ClientPage = () => {
     const barcodeBuffer = useRef('');
     const barcodeTimeout = useRef(null);
 
+    const CACHE_KEY = 'inventar_cache';
+
+    const saveCache = (products, lastVisibleId, isEnd, total) => {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+            products,
+            lastVisibleId: lastVisibleId || null,
+            isEnd,
+            total
+        }));
+    };
+
+    const loadCache = () => {
+        try {
+            const raw = sessionStorage.getItem(CACHE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch { return null; }
+    };
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             console.log(auth)
@@ -49,7 +67,7 @@ const ClientPage = () => {
                     if (!userDocSnap.data().isAdmin) {
                         auth.signOut();
                         router.push('/login');
-                    }else{
+                    } else {
                         setSignedIn(true)
                     }
                 } else {
@@ -92,8 +110,55 @@ const ClientPage = () => {
         return () => window.removeEventListener('keydown', handleKeyPress);
     }, [scanMode]);
 
+
+    const restoreScroll = (lastClickedId, savedScroll) => {
+        if (!lastClickedId) {
+            window.scrollTo(0, Number(savedScroll || 0));
+            sessionStorage.removeItem('inventar_scroll');
+            return;
+        }
+
+        let attempts = 0;
+        const maxAttempts = 20; // max 1 secundă (20 × 50ms)
+
+        const interval = setInterval(() => {
+            const el = document.querySelector(`[data-product-id="${lastClickedId}"]`);
+            attempts++;
+
+            if (el) {
+                clearInterval(interval);
+                el.scrollIntoView({ behavior: 'instant', block: 'center' });
+                sessionStorage.removeItem('inventar_lastClickedId');
+                sessionStorage.removeItem('inventar_scroll');
+            } else if (attempts >= maxAttempts) {
+                clearInterval(interval);
+                window.scrollTo(0, Number(savedScroll || 0));
+                sessionStorage.removeItem('inventar_scroll');
+            }
+        }, 50);
+    };
+
     useEffect(() => {
-        fetchProducts(true);
+        const cache = loadCache();
+        const savedScroll = sessionStorage.getItem('inventar_scroll');
+        const lastClickedId = sessionStorage.getItem('inventar_lastClickedId');
+
+        if (cache) {
+            setProducts(cache.products);
+            setIsEnd(cache.isEnd);
+            setOverAllInfo({ total: cache.total });
+
+            if (cache.lastVisibleId && !cache.isEnd) {
+                getDoc(doc(db, "releases", cache.lastVisibleId)).then(snap => {
+                    if (snap.exists()) setLastVisible(snap);
+                });
+            }
+
+            // Pornește polling-ul după setProducts
+            restoreScroll(lastClickedId, savedScroll);
+        } else {
+            fetchProducts(true);
+        }
     }, []);
 
     const fetchProducts = async (isInitial = false, search = "") => {
@@ -102,8 +167,14 @@ const ClientPage = () => {
 
         try {
             const productsRef = collection(db, "releases");
-            const countSnapshot = await getCountFromServer(productsRef);
-            setOverAllInfo(prev => ({ ...prev, total: countSnapshot.data().count }));
+
+            // Citim count doar la initial load sau search, nu la load more
+            let total = overAllInfo.total;
+            if (isInitial || search) {
+                const countSnapshot = await getCountFromServer(productsRef);
+                total = countSnapshot.data().count;
+                setOverAllInfo({ total });
+            }
 
             let newData = [];
             let lastDoc = null;
@@ -123,24 +194,33 @@ const ClientPage = () => {
                         where("artist_lowercase", "<=", search.toLowerCase() + "\uf8ff"),
                         limit(PAGE_SIZE)
                     );
-                    const documentSnapshots = await getDocs(q);
-                    newData = documentSnapshots.docs.map(d => ({ id: d.id, ...d.data(), inInventar: true }));
-                    lastDoc = documentSnapshots.docs[documentSnapshots.docs.length - 1];
-                    setIsEnd(documentSnapshots.docs.length < PAGE_SIZE);
+                    const snap = await getDocs(q);
+                    newData = snap.docs.map(d => ({ id: d.id, ...d.data(), inInventar: true }));
+                    lastDoc = snap.docs[snap.docs.length - 1];
+                    setIsEnd(snap.docs.length < PAGE_SIZE);
                 }
+
+                setProducts(newData);
+                setLastVisible(lastDoc);
+                // Nu cacheuim search-urile, sunt temporare
             } else {
                 const q = isInitial
                     ? query(productsRef, orderBy("artist_lowercase"), limit(PAGE_SIZE))
                     : query(productsRef, orderBy("artist_lowercase"), startAfter(lastVisible), limit(PAGE_SIZE));
 
-                const documentSnapshots = await getDocs(q);
-                newData = documentSnapshots.docs.map(d => ({ id: d.id, ...d.data(), inInventar: true }));
-                lastDoc = documentSnapshots.docs[documentSnapshots.docs.length - 1];
-                setIsEnd(documentSnapshots.docs.length < PAGE_SIZE);
-            }
+                const snap = await getDocs(q);
+                newData = snap.docs.map(d => ({ id: d.id, ...d.data(), inInventar: true }));
+                lastDoc = snap.docs[snap.docs.length - 1];
+                const ended = snap.docs.length < PAGE_SIZE;
 
-            setProducts(prev => (isInitial || search) ? newData : [...prev, ...newData]);
-            setLastVisible(lastDoc);
+                const updatedProducts = isInitial ? newData : [...products, ...newData];
+                setProducts(updatedProducts);
+                setLastVisible(lastDoc);
+                setIsEnd(ended);
+
+                // Salvează în cache după fiecare fetch normal
+                saveCache(updatedProducts, lastDoc?.id || null, ended, total);
+            }
         } catch (error) {
             console.error("Eroare Firebase:", error);
         } finally {
@@ -149,11 +229,11 @@ const ClientPage = () => {
     };
 
     const handleSearch = (e) => {
-        const value = e.target.value;
-        setSearchTerm(value);
-        if (value.length >= 2 || value.length === 0) {
-            fetchProducts(true, value);
-        }
+        // const value = e.target.value;
+        // setSearchTerm(value);
+        // if (value.length >= 2 || value.length === 0) {
+        //     fetchProducts(true, value);
+        // }
     };
 
     const handleUpdatePrice = async (id, newPrice, newStock, e) => {
@@ -162,6 +242,15 @@ const ClientPage = () => {
             await updateDoc(doc(db, "releases", String(id)), {
                 price: Number(newPrice),
                 stock: Number(newStock)
+            });
+            setProducts(prev => {
+                const updated = prev.map(p =>
+                    String(p.id) === String(id)
+                        ? { ...p, price: Number(newPrice), stock: Number(newStock) }
+                        : p
+                );
+                saveCache(updated, lastVisible?.id || null, isEnd, overAllInfo.total);
+                return updated;
             });
             alert("Actualizat!");
         } catch (error) {
@@ -224,6 +313,28 @@ const ClientPage = () => {
         }
     };
 
+    const handleDeleteProduct = async (id, e) => {
+        e.stopPropagation();
+        const product = products.find(p => String(p.id) === String(id));
+        const confirmed = window.confirm(
+            `Ești sigur că vrei să ștergi "${product?.title}" de ${product?.artist}?\n\nAceastă acțiune este ireversibilă!`
+        );
+        if (!confirmed) return;
+
+        try {
+            await deleteDoc(doc(db, "releases", String(id)));
+            setProducts(prev => {
+                const updated = prev.filter(p => String(p.id) !== String(id));
+                const newTotal = overAllInfo.total - 1;
+                setOverAllInfo({ total: newTotal });
+                saveCache(updated, lastVisible?.id || null, isEnd, newTotal);
+                return updated;
+            });
+        } catch (err) {
+            alert("Eroare la ștergere: " + err.message);
+        }
+    };
+
     const handleAddToInventory = async (p, price, stock, e) => {
         e.stopPropagation();
         try {
@@ -255,30 +366,18 @@ const ClientPage = () => {
             };
 
             await setDoc(productRef, newProduct);
-            setProducts(prev => prev.map(prod =>
-                prod.id === p.id ? { ...prod, ...newProduct, inInventar: true } : prod
-            ));
-            setOverAllInfo(prev => ({ ...prev, total: prev.total + 1 }));
+            setProducts(prev => {
+                const updated = prev.map(prod =>
+                    prod.id === p.id ? { ...prod, ...newProduct, inInventar: true } : prod
+                );
+                const newTotal = overAllInfo.total + 1;
+                setOverAllInfo({ total: newTotal });
+                saveCache(updated, lastVisible?.id || null, isEnd, newTotal);
+                return updated;
+            });
             alert("Produs adăugat în inventar!");
         } catch (error) {
             alert("Eroare la adăugare: " + error.message);
-        }
-    };
-
-    const handleDeleteProduct = async (id, e) => {
-        e.stopPropagation();
-        const product = products.find(p => String(p.id) === String(id));
-        const confirmed = window.confirm(
-            `Ești sigur că vrei să ștergi "${product?.title}" de ${product?.artist}?\n\nAceastă acțiune este ireversibilă!`
-        );
-        if (!confirmed) return;
-
-        try {
-            await deleteDoc(doc(db, "releases", String(id)));
-            setProducts(prev => prev.filter(p => String(p.id) !== String(id)));
-            setOverAllInfo(prev => ({ ...prev, total: prev.total - 1 }));
-        } catch (err) {
-            alert("Eroare la ștergere: " + err.message);
         }
     };
 
@@ -351,7 +450,14 @@ const ClientPage = () => {
         }
     };
 
-    if (!signedIn) return null;
+    // La salvare (în handleProductClick):
+    const handleProductClick = (id) => {
+        sessionStorage.setItem('inventar_scroll', window.scrollY);
+        sessionStorage.setItem('inventar_lastClickedId', String(id));
+        router.push(`/produs/${id}`);
+    };
+
+    // if (!signedIn) return null;
 
     return (
         <div className='mainPage'>
@@ -389,7 +495,7 @@ const ClientPage = () => {
                 </div>
             )}
             {scanMode === 'search' && (
-                <div className="mode-indicator" style={{ background: '#e8f5e9', color: '#2e7d32', borderColor: '#c8e6c9'}}>
+                <div className="mode-indicator" style={{ background: '#e8f5e9', color: '#2e7d32', borderColor: '#c8e6c9' }}>
                     <GrStatusGoodSmall color='green' /> Mod căutare activ — scanează produsul pentru a-l găsi în inventar
                 </div>
             )}
@@ -419,7 +525,7 @@ const ClientPage = () => {
                     <div
                         key={p.id}
                         className={`product-card ${!p.inInventar ? 'not-in-inventory' : ''}`}
-                        onClick={() => router.push(`/produs/${p.id}`)}
+                        onClick={() => handleProductClick(p.id)}
                         style={{ cursor: 'pointer' }}
                     >
                         <div className="product-main-content">

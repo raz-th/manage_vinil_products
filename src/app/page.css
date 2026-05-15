@@ -155,7 +155,43 @@
     font-weight: 800;
     margin: 0.5rem 0 0 0;
     color: #0f172a;
-      width: fit-content;
+    width: fit-content;
+}
+
+.format-filters {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.format-filters-fixed{
+    position: fixed;
+    top: 1rem;
+    z-index: 10;
+    background: white;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+.filter-btn {
+    padding: 0.4rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+    color: #333;
+}
+
+.filter-btn:hover {
+    background: #f0f0f0;
+}
+
+.filter-btn.active {
+    background: #333;
+    color: white;
+    border-color: #333;
 }
 
 .product-info strong {
@@ -175,6 +211,7 @@ input {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
+    position: relative;
 }
 
 .searchUsege {
@@ -182,9 +219,21 @@ input {
     flex-direction: column-reverse;
     align-items: flex-end;
     width: 100%;
-    gap: 1rem;
+    gap: .2rem;
 }
-
+.searchUsege button{
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    background: white;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 .search-wrapper h3 {
     display: none;
 }
@@ -618,7 +667,7 @@ input {
     align-items: center;
     margin: 2rem 0;
     flex-wrap: wrap;
-    
+
 }
 
 .pagination button {

@@ -14,6 +14,7 @@ import { MdDelete } from 'react-icons/md';
 import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { GrStatusGoodSmall } from 'react-icons/gr';
+import { FaSearch } from 'react-icons/fa';
 
 const PAGE_SIZE = 20;
 
@@ -23,7 +24,7 @@ const ClientPage = () => {
     const [lastVisible, setLastVisible] = useState(null);
     const [isEnd, setIsEnd] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-    const [overAllInfo, setOverAllInfo] = useState({ total: 0 });
+    const [overAllInfo, setOverAllInfo] = useState({ total: 0, cd: 0, vinyl: 0 });
     const [scanMode, setScanMode] = useState("search"); // "search" | "sale"
     const [saleResults, setSaleResults] = useState([]);
     const [saleQuantity, setSaleQuantity] = useState(1);
@@ -31,10 +32,32 @@ const ClientPage = () => {
     const [scanStatus, setScanStatus] = useState(null);
     const router = useRouter();
     const [signedIn, setSignedIn] = useState(false);
-
-
+    const [formatFilter, setFormatFilter] = useState("all");
     const barcodeBuffer = useRef('');
     const barcodeTimeout = useRef(null);
+
+    const [scrollY, setScrollY] = useState(0);
+
+    const [searchRestored, setSearchRestored] = useState(false);
+
+    useEffect(() => {
+        if (searchRestored && searchTerm) {
+            fetchProducts(true, searchTerm);
+            setSearchRestored(false);
+        }
+    }, [searchRestored]);
+
+    useEffect(() => {
+        const handleScroll = () => setScrollY(window.scrollY);
+        window.addEventListener("scroll", handleScroll);
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
+
+    useEffect(() => {
+        console.log(scrollY)
+    }, [scrollY])
+
+
 
     const CACHE_KEY = 'inventar_cache';
 
@@ -142,11 +165,20 @@ const ClientPage = () => {
         const cache = loadCache();
         const savedScroll = sessionStorage.getItem('inventar_scroll');
         const lastClickedId = sessionStorage.getItem('inventar_lastClickedId');
+        const savedSearch = sessionStorage.getItem('inventar_search');
+
 
         if (cache) {
+            let cd = 0;
+            cache.products.map((v) => v.format === "CD" ? cd++ : {});
             setProducts(cache.products);
             setIsEnd(cache.isEnd);
-            setOverAllInfo({ total: cache.total });
+            setOverAllInfo({ total: cache.total, cd });
+
+            if (savedSearch) {
+                setSearchTerm(savedSearch);
+                setSearchRestored(true); 
+            }
 
             if (cache.lastVisibleId && !cache.isEnd) {
                 getDoc(doc(db, "releases", cache.lastVisibleId)).then(snap => {
@@ -154,26 +186,32 @@ const ClientPage = () => {
                 });
             }
 
-            // Pornește polling-ul după setProducts
             restoreScroll(lastClickedId, savedScroll);
         } else {
             fetchProducts(true);
         }
     }, []);
 
-    const fetchProducts = async (isInitial = false, search = "") => {
+    const fetchProducts = async (isInitial = false, search = "", filter = formatFilter) => {
         if (loading) return;
         setLoading(true);
 
         try {
             const productsRef = collection(db, "releases");
 
-            // Citim count doar la initial load sau search, nu la load more
             let total = overAllInfo.total;
+            let cd = overAllInfo.cd;
+            let vinyl = overAllInfo.vinyl;
+
             if (isInitial || search) {
                 const countSnapshot = await getCountFromServer(productsRef);
+                const cdSnapshot = await getCountFromServer(query(productsRef, where("format", "==", "CD")));
+                const vinylSnapshot = await getCountFromServer(query(productsRef, where("format", "==", "Vinyl")));
+
                 total = countSnapshot.data().count;
-                setOverAllInfo({ total });
+                cd = cdSnapshot.data().count;
+                vinyl = vinylSnapshot.data().count;
+                setOverAllInfo({ total, cd, vinyl });
             }
 
             let newData = [];
@@ -187,13 +225,14 @@ const ClientPage = () => {
                     newData = [{ id: docSnap.id, ...docSnap.data(), inInventar: true }];
                     setIsEnd(true);
                 } else {
-                    const q = query(
-                        productsRef,
+                    const constraints = [
                         orderBy("artist_lowercase"),
                         where("artist_lowercase", ">=", search.toLowerCase()),
                         where("artist_lowercase", "<=", search.toLowerCase() + "\uf8ff"),
+                        ...(filter !== "all" ? [where("format", "==", filter)] : []),
                         limit(PAGE_SIZE)
-                    );
+                    ];
+                    const q = query(productsRef, ...constraints);
                     const snap = await getDocs(q);
                     newData = snap.docs.map(d => ({ id: d.id, ...d.data(), inInventar: true }));
                     lastDoc = snap.docs[snap.docs.length - 1];
@@ -202,11 +241,15 @@ const ClientPage = () => {
 
                 setProducts(newData);
                 setLastVisible(lastDoc);
-                // Nu cacheuim search-urile, sunt temporare
+
             } else {
-                const q = isInitial
-                    ? query(productsRef, orderBy("artist_lowercase"), limit(PAGE_SIZE))
-                    : query(productsRef, orderBy("artist_lowercase"), startAfter(lastVisible), limit(PAGE_SIZE));
+                const constraints = [
+                    orderBy("artist_lowercase"),
+                    ...(filter !== "all" ? [where("format", "==", filter)] : []),
+                    ...(isInitial ? [] : [startAfter(lastVisible)]),
+                    limit(PAGE_SIZE)
+                ];
+                const q = query(productsRef, ...constraints);
 
                 const snap = await getDocs(q);
                 newData = snap.docs.map(d => ({ id: d.id, ...d.data(), inInventar: true }));
@@ -218,8 +261,7 @@ const ClientPage = () => {
                 setLastVisible(lastDoc);
                 setIsEnd(ended);
 
-                // Salvează în cache după fiecare fetch normal
-                saveCache(updatedProducts, lastDoc?.id || null, ended, total);
+                saveCache(updatedProducts, lastDoc?.id || null, ended, total, cd, vinyl);
             }
         } catch (error) {
             console.error("Eroare Firebase:", error);
@@ -229,11 +271,10 @@ const ClientPage = () => {
     };
 
     const handleSearch = (e) => {
-        // const value = e.target.value;
-        // setSearchTerm(value);
-        // if (value.length >= 2 || value.length === 0) {
-        //     fetchProducts(true, value);
-        // }
+        sessionStorage.removeItem('inventar_search');
+        if (searchTerm.length >= 2 || searchTerm.length === 0) {
+            fetchProducts(true, searchTerm);
+        }
     };
 
     const handleUpdatePrice = async (id, newPrice, newStock, e) => {
@@ -454,7 +495,15 @@ const ClientPage = () => {
     const handleProductClick = (id) => {
         sessionStorage.setItem('inventar_scroll', window.scrollY);
         sessionStorage.setItem('inventar_lastClickedId', String(id));
+        sessionStorage.setItem('inventar_search', searchTerm); // ← add this
         router.push(`/produs/${id}`);
+    };
+
+    const handleFilterChange = (format) => {
+        setFormatFilter(format);
+        setLastVisible(null);
+        setIsEnd(false);
+        fetchProducts(true, searchTerm, format);
     };
 
     // if (!signedIn) return null;
@@ -505,18 +554,87 @@ const ClientPage = () => {
                     <p>TOTAL PRODUSE</p>
                     <h1>{overAllInfo.total}</h1>
                 </div>
+                <div>
+                    <p>CD-uri</p>
+                    <h1>{overAllInfo.cd}</h1>
+                </div>
+                <div>
+                    <p>VINILURI</p>
+                    <h1>{overAllInfo.vinyl}</h1>
+                </div>
             </div>
 
             <div className="search-wrapper">
-                <h3>Listă inventar</h3>
+                <div style={{ display: 'flex', gap: '2rem' }}>
+                    <h3>Listă inventar</h3>
+                    <div className="format-filters">
+                        <button
+                            className={`filter-btn ${formatFilter === 'all' ? 'active' : ''}`}
+                            onClick={() => handleFilterChange('all')}
+                        >
+                            Toate
+                        </button>
+                        <button
+                            className={`filter-btn ${formatFilter === 'Vinyl' ? 'active' : ''}`}
+                            onClick={() => handleFilterChange('Vinyl')}
+                        >
+                            Vinil
+                        </button>
+                        <button
+                            className={`filter-btn ${formatFilter === 'CD' ? 'active' : ''}`}
+                            onClick={() => handleFilterChange('CD')}
+                        >
+                            CD
+                        </button>
+                    </div>
+                </div>
+                <div style={{ display: scrollY > 350 ? 'flex' : 'none', gap: '2rem', position: 'fixed', justifyContent: 'space-between', top: 0, backgroundColor: '#fff', left: 0, right: 0, padding: '2rem' }}>
+                    <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+                        <h3>Listă inventar</h3>
+                        <div className="format-filters">
+                            <button
+                                className={`filter-btn ${formatFilter === 'all' ? 'active' : ''}`}
+                                onClick={() => handleFilterChange('all')}
+                            >
+                                Toate
+                            </button>
+                            <button
+                                className={`filter-btn ${formatFilter === 'Vinyl' ? 'active' : ''}`}
+                                onClick={() => handleFilterChange('Vinyl')}
+                            >
+                                Vinil
+                            </button>
+                            <button
+                                className={`filter-btn ${formatFilter === 'CD' ? 'active' : ''}`}
+                                onClick={() => handleFilterChange('CD')}
+                            >
+                                CD
+                            </button>
+                        </div>
+                    </div>
+                    <div className='searchUsege'>
+                        <input
+                            type="text"
+                            placeholder="Caută produs..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                            className="search-input"
+                        />
+                        <button type='submit' onClick={() => handleSearch()}><FaSearch /></button>
+                    </div>
+                </div>
+
                 <div className='searchUsege'>
                     <input
                         type="text"
                         placeholder="Caută produs..."
                         value={searchTerm}
-                        onChange={handleSearch}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                         className="search-input"
                     />
+                    <button type='submit' onClick={() => handleSearch()}><FaSearch /></button>
                 </div>
             </div>
 

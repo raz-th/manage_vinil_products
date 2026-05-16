@@ -18,6 +18,16 @@ import { FaSearch } from 'react-icons/fa';
 
 const PAGE_SIZE = 20;
 
+
+const filterValues = [
+    'all',
+    'CD', 'Vinyl',
+    'Minidisc', 'CDr',
+    'Box Set', 'Cassette',
+    'DVD', 'Blu-ray',
+    'SACD'
+]
+
 const ClientPage = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -177,7 +187,7 @@ const ClientPage = () => {
 
             if (savedSearch) {
                 setSearchTerm(savedSearch);
-                setSearchRestored(true); 
+                setSearchRestored(true);
             }
 
             if (cache.lastVisibleId && !cache.isEnd) {
@@ -568,48 +578,41 @@ const ClientPage = () => {
                 <div style={{ display: 'flex', gap: '2rem' }}>
                     <h3>Listă inventar</h3>
                     <div className="format-filters">
-                        <button
-                            className={`filter-btn ${formatFilter === 'all' ? 'active' : ''}`}
-                            onClick={() => handleFilterChange('all')}
-                        >
-                            Toate
-                        </button>
-                        <button
-                            className={`filter-btn ${formatFilter === 'Vinyl' ? 'active' : ''}`}
-                            onClick={() => handleFilterChange('Vinyl')}
-                        >
-                            Vinil
-                        </button>
-                        <button
-                            className={`filter-btn ${formatFilter === 'CD' ? 'active' : ''}`}
-                            onClick={() => handleFilterChange('CD')}
-                        >
-                            CD
-                        </button>
+                        {
+                            filterValues.map((v, i) => (<button
+                                className={`filter-btn ${formatFilter === v ? 'active' : ''}`}
+                                onClick={() => handleFilterChange(v)}
+                                key={i}
+                            >
+                                {v === 'all' ? 'Toate' : v}
+                            </button>))
+                        }
                     </div>
                 </div>
-                <div style={{ display: scrollY > 350 ? 'flex' : 'none', gap: '2rem', position: 'fixed', justifyContent: 'space-between', top: 0, backgroundColor: '#fff', left: 0, right: 0, padding: '2rem' }}>
+                <div style={{
+                    display: scrollY > 350 ? 'flex' : 'none',
+                    gap: '2rem',
+                    position: 'fixed',
+                    justifyContent: 'space-between',
+                    top: 0,
+                    backgroundColor: '#f8fafc',
+                    left: 0,
+                    right: 0,
+                    padding: '2rem',
+                    borderBottom: '#fff 1px solid'
+                }}>
                     <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
                         <h3>Listă inventar</h3>
                         <div className="format-filters">
-                            <button
-                                className={`filter-btn ${formatFilter === 'all' ? 'active' : ''}`}
-                                onClick={() => handleFilterChange('all')}
-                            >
-                                Toate
-                            </button>
-                            <button
-                                className={`filter-btn ${formatFilter === 'Vinyl' ? 'active' : ''}`}
-                                onClick={() => handleFilterChange('Vinyl')}
-                            >
-                                Vinil
-                            </button>
-                            <button
-                                className={`filter-btn ${formatFilter === 'CD' ? 'active' : ''}`}
-                                onClick={() => handleFilterChange('CD')}
-                            >
-                                CD
-                            </button>
+                            {
+                                filterValues.map((v, i) => (<button
+                                    className={`filter-btn ${formatFilter === v ? 'active' : ''}`}
+                                    onClick={() => handleFilterChange(v)}
+                                    key={i}
+                                >
+                                    {v === 'all' ? 'Toate' : v}
+                                </button>))
+                            }
                         </div>
                     </div>
                     <div className='searchUsege'>

@@ -99,6 +99,48 @@
     margin-bottom: 20px;
 }
 
+.radio-inputs {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  border-radius: 0.5rem;
+  background-color: #ffffff;
+  box-sizing: border-box;
+  box-shadow: 0 0 0px 1px rgba(0, 0, 0, 0.06);
+  padding: 0.25rem;
+  width: 300px;
+  font-size: 14px;
+  width: 100%;
+  /* gap: 2rem; */
+  margin-bottom: 1rem;
+}
+
+.radio-inputs .radio {
+  flex: 1 1 auto;
+  text-align: center;
+}
+
+.radio-inputs .radio input {
+  display: none;
+}
+
+.radio-inputs .radio .name {
+  display: flex;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: none;
+  padding: .5rem 0;
+  color: rgba(51, 65, 85, 1);
+  transition: all .15s ease-in-out;
+}
+
+.radio-inputs .radio input:checked + .name {
+  background-color: #f1f5f9;
+  font-weight: 600;
+}
+
 .badge-content {
     display: flex;
     align-items: center;
@@ -148,6 +190,11 @@
     letter-spacing: 0.05em;
     color: var(--text-muted);
     margin-bottom: 1rem;
+    max-width: fit-content;
+}
+
+* {
+    box-sizing: border-box;
 }
 
 .input-group {
@@ -155,14 +202,17 @@
     flex-direction: column;
     gap: 0.5rem;
     margin-bottom: 1rem;
+    /* max-width: 20rem; */
 }
 
 .input-group label {
     font-size: 0.875rem;
     font-weight: 600;
+     max-width: fit-content;
 }
 
 input,
+textarea,
 select {
     padding: 0.75rem;
     background: #f1f5f9;
@@ -172,13 +222,18 @@ select {
     outline: none;
     transition: all 0.2s;
     color: var(--text-main);
+    resize: vertical;
+    
 }
 
 input:focus,
+textarea:focus,
 select:focus {
     background: #fff;
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .input-with-button {
@@ -238,6 +293,9 @@ select:focus {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
+}
+.grid-2-cols > * {
+    min-width: 0;
 }
 
 .col-span-2 {

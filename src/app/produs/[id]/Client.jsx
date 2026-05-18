@@ -5,51 +5,131 @@ import { db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import './produs.css';
 
+// const optiuni_stareCoperta = [
+//     "VG",
+//     "VG+",
+//     "NM"
+// ]
+
+// const optiuni_stareDisc = [
+//     "Stare buna",
+//     "Stare foarte buna",
+// ]
+
+const optiuni_stareCoperta = {
+    "cd": {
+        label: "Stare carcasă",
+        stare: [
+            "Stare buna",
+            "Stare foarte buna",
+        ]
+    },
+    "vinyl": {
+        label: "Stare copertă",
+        stare: [
+            "VG",
+            "VG+",
+            "NM"
+        ]
+    },
+    "default": {
+        label: "Stare carcasă",
+        stare: [
+            "Stare buna",
+            "Stare foarte buna",
+        ]
+    },
+}
+
+const optiuni_stareDisc = {
+    "cd": {
+        label: "Stare disc",
+        stare: [
+            "Stare buna",
+            "Stare foarte buna",
+        ]
+    },
+    "vinyl": {
+        label: "Stare vinil",
+        stare: [
+            "VG",
+            "VG+",
+            "NM"
+        ]
+    },
+    "default": {
+        label: "Stare disc",
+        stare: [
+            "Stare buna",
+            "Stare foarte buna",
+        ]
+    },
+}
+
 export default function ProdusManagement({ id }) {
     const router = useRouter();
     const [produs, setProdus] = useState(null);
     const [loading, setLoading] = useState(true);
-
-    const [price, setPrice] = useState(0);
-    const [stock, setStock] = useState(0);
     const [saving, setSaving] = useState(false);
 
-    const [oferta, setOferta] = useState({
-        activa: false,
-        procent: '',
-        dataStart: '',
-        dataEnd: '',
+    const [formData, setFormData] = useState({
+        descriere: '',
+        price: 0,
+        stock: 0,
+        stare: {
+            coperta: '',
+            disc: '',
+        },
+        oferta: {
+            activa: false,
+            procent: '',
+            dataStart: '',
+            dataEnd: '',
+        },
     });
-    useEffect(() => console.log(oferta), [oferta])
 
+    const handleChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        const val = type === 'checkbox' ? checked : value;
+
+        if (name.includes('.')) {
+            const [parent, child] = name.split('.');
+            setFormData(prev => ({
+                ...prev,
+                [parent]: { ...prev[parent], [child]: val }
+            }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: val }));
+        }
+    };
 
     useEffect(() => {
         const today = new Date();
         const yyyy = today.getFullYear();
-        let mm = today.getMonth() + 1;
-        let dd = today.getDate();
+        let mm = String(today.getMonth() + 1).padStart(2, '0');
+        let dd = String(today.getDate()).padStart(2, '0');
+        const formattedToday = `${yyyy}-${mm}-${dd}`;
 
-        if (dd < 10) dd = '0' + dd;
-        if (mm < 10) mm = '0' + mm;
-
-        const formattedToday = yyyy + '-' + mm + '-' + dd;
-
-        const fetchProodus = async () => {
+        const fetchProdus = async () => {
             try {
                 const snap = await getDoc(doc(db, 'releases', String(id)));
-                if (!snap.exists()) {
-                    setLoading(false);
-                    return;
-                }
+                if (!snap.exists()) { setLoading(false); return; }
                 const data = { id: snap.id, ...snap.data() };
                 setProdus(data);
-                setPrice(data.price ?? 0);
-                setStock(data.stock ?? 0);
-                setOferta({
-                    activa: data.oferta?.activa || false,
-                    procent: data.oferta?.procent || '',
-                    dataStart: data.oferta?.dataStart || formattedToday,
-                    dataEnd: data.oferta?.dataEnd || formattedToday,
+                setFormData({
+                    descriere: data.description ?? '',
+                    price: data.price ?? 0,
+                    stock: data.stock ?? 0,
+                    stare: {
+                        coperta: data.stare?.coperta ?? '',
+                        disc: data.stare?.disc ?? '',
+                    },
+                    oferta: {
+                        activa: data.oferta?.activa || false,
+                        procent: data.oferta?.procent || '',
+                        dataStart: data.oferta?.dataStart || formattedToday,
+                        dataEnd: data.oferta?.dataEnd || formattedToday,
+                    },
                 });
             } catch (err) {
                 console.error(err);
@@ -57,25 +137,30 @@ export default function ProdusManagement({ id }) {
                 setLoading(false);
             }
         };
-        fetchProodus();
+        fetchProdus();
     }, [id]);
 
-    const pretRedus = oferta.procent
-        ? (price - (price * oferta.procent) / 100).toFixed(2)
+    const pretRedus = formData.oferta.procent
+        ? (formData.price - (formData.price * formData.oferta.procent) / 100).toFixed(2)
         : null;
 
     const handleSave = async () => {
         setSaving(true);
         try {
             await updateDoc(doc(db, 'releases', String(id)), {
-                price: Number(price),
-                stock: Number(stock),
+                price: Number(formData.price),
+                stock: Number(formData.stock),
+                description: formData.descriere,
+                stare: {
+                    coperta: formData.stare.coperta,
+                    disc: formData.stare.disc,
+                },
                 oferta: {
-                    activa: oferta.activa,
-                    procent: Number(oferta.procent) || 0,
-                    dataStart: oferta.dataStart || '',
-                    dataEnd: oferta.dataEnd || '',
-                }
+                    activa: formData.oferta.activa,
+                    procent: Number(formData.oferta.procent) || 0,
+                    dataStart: formData.oferta.dataStart || '',
+                    dataEnd: formData.oferta.dataEnd || '',
+                },
             });
             alert('Salvat cu succes!');
         } catch (err) {
@@ -90,7 +175,6 @@ export default function ProdusManagement({ id }) {
             `Ești sigur că vrei să ștergi complet "${produs.title}" de ${produs.artist}?\n\nAceastă acțiune este ireversibilă!`
         );
         if (!confirmed) return;
-
         try {
             await deleteDoc(doc(db, 'releases', String(id)));
             router.push('/');
@@ -109,11 +193,7 @@ export default function ProdusManagement({ id }) {
                 <button className="pm-back" onClick={() => router.back()}>← Înapoi</button>
 
                 <div className="pm-header">
-                    <img
-                        src={produs.cover_image || '/assets/image.png'}
-                        alt={produs.title}
-                        className="pm-cover"
-                    />
+                    <img src={produs.cover_image || '/assets/image.png'} alt={produs.title} className="pm-cover" />
                     <div className="pm-header-info">
                         <span className="pm-format">{produs.format} · {produs.format_desc}</span>
                         <h1>{produs.title}</h1>
@@ -125,10 +205,8 @@ export default function ProdusManagement({ id }) {
                         </div>
                         <div className="pm-genres">
                             {produs.genres?.map(g => <span key={g} className="pm-tag">{g}</span>)}
-                            {/* {produs.styles?.map(s => <span key={s} className="pm-tag pm-tag-style">{s}</span>)} */}
                         </div>
                         <div className="pm-genres">
-                            {/* {produs.genres?.map(g => <span key={g} className="pm-tag">{g}</span>)} */}
                             {produs.styles?.map(s => <span key={s} className="pm-tag pm-tag-style">{s}</span>)}
                         </div>
                         <small className="pm-id">ID: {produs.id}</small>
@@ -137,15 +215,45 @@ export default function ProdusManagement({ id }) {
 
                 <div className="pm-sections">
                     <section className="pm-section">
+                        <div className="input-group col-span-2">
+                            <label>Descriere</label>
+                            <textarea
+                                name="descriere"
+                                value={formData.descriere}
+                                onChange={handleChange}
+                                placeholder="Descriere..."
+                                style={{ height: "10rem" }}
+                            />
+                        </div>
+                        <div className='grid-2-cols'>
+                            <div className="input-group ">
+                                <label>{optiuni_stareCoperta[produs.format.toLowerCase()]?.label ?? optiuni_stareCoperta["default"].label}</label>
+                                <select name="stare.coperta" value={formData.stare.coperta} onChange={handleChange}>
+                                    <option value="">Selectează gradația</option>
+                                    {(optiuni_stareCoperta[produs.format.toLowerCase()] ?? optiuni_stareCoperta["default"]).stare.map((v, i) => <option key={i} value={v}>{v}</option>)}
+                                </select>
+                            </div>
+                            <div className="input-group">
+                                <label>{optiuni_stareDisc[produs.format.toLowerCase()]?.label ?? optiuni_stareDisc["default"].label}</label>
+                                <select name="stare.disc" value={formData.stare.disc} onChange={handleChange}>
+                                    <option value="">Selectează gradația</option>
+                                    {(optiuni_stareDisc[produs.format.toLowerCase()] ?? optiuni_stareDisc["default"]).stare.map((v, i) => <option key={i} value={v}>{v}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                    </section>
+
+                    <section className="pm-section">
                         <h2>Stoc & Preț</h2>
                         <div className="pm-grid">
                             <div className="pm-field">
                                 <label>Stoc</label>
-                                <input type="number" value={stock} onChange={e => setStock(e.target.value)} />
+                                <input type="number" name="stock" value={formData.stock} onChange={handleChange} />
                             </div>
                             <div className="pm-field">
                                 <label>Preț (RON)</label>
-                                <input type="number" value={price} onChange={e => setPrice(e.target.value)} />
+                                <input type="number" name="price" value={formData.price} onChange={handleChange} />
                             </div>
                         </div>
                     </section>
@@ -156,63 +264,50 @@ export default function ProdusManagement({ id }) {
                             <label className="pm-toggle">
                                 <input
                                     type="checkbox"
-                                    checked={oferta.activa}
-                                    onChange={e => setOferta(prev => ({ ...prev, activa: e.target.checked }))}
+                                    name="oferta.activa"
+                                    checked={formData.oferta.activa}
+                                    onChange={handleChange}
                                 />
-                                <span>{oferta.activa ? 'Activă' : 'Inactivă'}</span>
+                                <span>{formData.oferta.activa ? 'Activă' : 'Inactivă'}</span>
                             </label>
                         </div>
 
-                        {oferta.activa && (
+                        {formData.oferta.activa && (
                             <div className="pm-grid">
                                 <div className="pm-field">
                                     <label>Reducere (%)</label>
                                     <input
                                         type="number"
-                                        min={1}
-                                        max={99}
-                                        value={oferta.procent}
-                                        onChange={e => setOferta(prev => ({ ...prev, procent: e.target.value }))}
+                                        name="oferta.procent"
+                                        min={1} max={99}
+                                        value={formData.oferta.procent}
+                                        onChange={handleChange}
                                         placeholder="ex: 25"
                                     />
                                 </div>
                                 <div className="pm-field">
                                     <label>Preț după reducere</label>
-                                    <input
-                                        type="text"
-                                        value={pretRedus ? `${pretRedus} RON` : '—'}
-                                        disabled
-                                        className="pm-input-disabled"
-                                    />
+                                    <input type="text" value={pretRedus ? `${pretRedus} RON` : '—'} disabled className="pm-input-disabled" />
                                 </div>
                                 <div className="pm-field">
                                     <label>Data start</label>
-                                    <input
-                                        type="date"
-
-                                        value={oferta.dataStart}
-                                        onChange={e => setOferta(prev => ({ ...prev, dataStart: e.target.value }))}
-                                    />
+                                    <input type="date" name="oferta.dataStart" value={formData.oferta.dataStart} onChange={handleChange} />
                                 </div>
                                 <div className="pm-field">
                                     <label>Data sfârșit</label>
-                                    <input
-                                        type="date"
-                                        value={oferta.dataEnd}
-                                        onChange={e => setOferta(prev => ({ ...prev, dataEnd: e.target.value }))}
-                                    />
+                                    <input type="date" name="oferta.dataEnd" value={formData.oferta.dataEnd} onChange={handleChange} />
                                 </div>
                             </div>
                         )}
 
-                        {oferta.activa && oferta.procent && (
+                        {formData.oferta.activa && formData.oferta.procent && (
                             <div className="pm-oferta-preview">
-                                <span className="pm-pret-vechi">{price} RON</span>
+                                <span className="pm-pret-vechi">{formData.price} RON</span>
                                 <span className="pm-pret-nou">{pretRedus} RON</span>
-                                <span className="pm-badge-reducere">-{oferta.procent}%</span>
-                                {oferta.dataStart && oferta.dataEnd && (
+                                <span className="pm-badge-reducere">-{formData.oferta.procent}%</span>
+                                {formData.oferta.dataStart && formData.oferta.dataEnd && (
                                     <span className="pm-perioada">
-                                        {oferta.dataStart} → {oferta.dataEnd}
+                                        {formData.oferta.dataStart} → {formData.oferta.dataEnd}
                                     </span>
                                 )}
                             </div>
@@ -224,12 +319,16 @@ export default function ProdusManagement({ id }) {
                     <button className="pm-save" onClick={handleSave} disabled={saving}>
                         {saving ? 'Se salvează...' : 'Salvează modificările'}
                     </button>
-                    {/* <button className="pm-delete" onClick={handleDelete}>
-                        🗑 Șterge produsul
-                    </button> */}
                 </div>
 
             </div>
         </div>
     );
 }
+
+
+
+
+{/* <button className="pm-delete" onClick={handleDelete}>
+                        🗑 Șterge produsul
+                    </button> */}

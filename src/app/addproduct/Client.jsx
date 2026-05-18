@@ -14,8 +14,30 @@ import './addprocuct.css'
 import BarcodeScanner from '@/components/BarcodeScanner';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { db } from '@/lib/firebase';
+import CreateMisteryBox from './createMisteryBox';
 
 const maxDots = 5;
+
+const formats = [
+    'CD', 'Vinyl',
+    'Minidisc', 'CDr',
+    'Box Set', 'Cassette',
+    'DVD', 'Blu-ray',
+    'SACD'
+]
+
+const optiuni_stareCoperta = [
+    "VG",
+    "VG+",
+    "NM"
+]
+
+const optiuni_stareDisc = [
+    "Stare buna",
+    "Stare foarte buna",
+]
+
+
 
 
 
@@ -30,7 +52,12 @@ export default function Client() {
         format: '',
         price: '',
         stock: '',
-        imageUrl: []
+        imageUrl: [],
+        description: '',
+        stare: {
+            coperta: "",
+            disc: ""
+        }
     });
     const [hasOverflow, setHasOverflow] = useState(false);
     const scrollRef = useRef(null);
@@ -45,6 +72,8 @@ export default function Client() {
 
     const barcodeBuffer = useRef('');
     const barcodeTimeout = useRef(null);
+
+    const [isMisteryBox, setIsMisteryBox] = useState(false);
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -73,7 +102,16 @@ export default function Client() {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+
+        if (name.includes('.')) {
+            const [parent, child] = name.split('.');
+            setFormData(prev => ({
+                ...prev,
+                [parent]: { ...prev[parent], [child]: value }
+            }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     };
 
     const handleScanToggle = () => {
@@ -136,7 +174,6 @@ export default function Client() {
                 return;
             }
 
-            // Găsește țara selectată din lista de countries
             const selectedCountry = countries.find(c => String(c.id) === String(formData.country));
 
             const productData = {
@@ -158,7 +195,9 @@ export default function Client() {
                 label: "",
                 genres: [],
                 styles: [],
+                description: formData.description,
                 date_added: new Date().toISOString(),
+                stare: formData.stare
             };
 
             await setDoc(productRef, productData);
@@ -345,103 +384,154 @@ export default function Client() {
                         <span className="badge-value">{formData.id}</span>
                     </div>
                 </div>
+                <div className="radio-inputs">
+                    <label className="radio">
+                        <input
+                            type="radio"
+                            name="radio"
+                            checked={!isMisteryBox}
+                            onChange={() => setIsMisteryBox(false)}
+                        />
+                        <span className="name">Produs normal</span>
+                    </label>
+                    <label className="radio">
+                        <input
+                            type="radio"
+                            name="radio"
+                            checked={isMisteryBox}
+                            onChange={() => setIsMisteryBox(true)}
+                        />
+                        <span className="name">Mistery box</span>
+                    </label>
+                </div>
                 {message.text && (
                     <div className={`alert alert-${message.type}`}>
                         {message.text}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="product-form">
-                    <section className="form-section">
-                        <h2 className="section-title">Identificare</h2>
-                        <div className="input-group">
-                            <label>Cod de bare</label>
-                            <div className="input-with-button">
-                                <input
-                                    name="scannedId"
-                                    value={formData.scannedId}
-                                    onChange={handleChange}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            if (formData.scannedId.trim().length > 3) {
-                                                handleScanner(formData.scannedId.trim());
-                                            }
-                                        }
-                                    }}
-                                    placeholder="Scanează sau introdu manual..."
-                                    autoFocus
-                                />
-                                {/* <button
+                {
+                    isMisteryBox ? <CreateMisteryBox /> :
+                        <form onSubmit={handleSubmit} className="product-form">
+                            <section className="form-section">
+                                <h2 className="section-title">Identificare</h2>
+                                <div className="input-group">
+                                    <label>Cod de bare</label>
+                                    <div className="input-with-button">
+                                        <input
+                                            name="scannedId"
+                                            value={formData.scannedId}
+                                            onChange={handleChange}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    if (formData.scannedId.trim().length > 3) {
+                                                        handleScanner(formData.scannedId.trim());
+                                                    }
+                                                }
+                                            }}
+                                            placeholder="Scanează sau introdu manual..."
+                                            autoFocus
+                                        />
+                                        {/* <button
                                     type="button"
                                     onClick={handleScanToggle}
                                     className={`btn-icon ${isScanning ? 'btn-scanning' : 'btn-black'}`}
                                 >
                                     <LucideBarcode size={24} />
                                 </button> */}
-                            </div>
-                        </div>
-                    </section>
+                                    </div>
+                                </div>
+                            </section>
 
-                    <section className="form-section">
-                        <h2 className="section-title">Detalii Produs</h2>
-                        <div className="grid-2-cols">
-                            <div className="input-group col-span-2">
-                                <label>Titlu</label>
-                                <input
-                                    name="title"
-                                    value={formData.title}
-                                    onChange={handleChange}
-                                    placeholder="Ex: Dark Side of the Moon"
-                                />
-                            </div>
+                            <section className="form-section">
+                                <h2 className="section-title">Detalii Produs</h2>
+                                <div className="grid-2-cols">
+                                    <div className="input-group col-span-2">
+                                        <label>Titlu</label>
+                                        <input
+                                            name="title"
+                                            value={formData.title}
+                                            onChange={handleChange}
+                                            placeholder="Ex: Dark Side of the Moon"
+                                        />
+                                    </div>
 
-                            <div className="input-group">
-                                <label>Artist</label>
-                                <input
-                                    name="artist"
-                                    value={formData.artist}
-                                    onChange={handleChange}
-                                    placeholder="Ex: Pink Floyd"
-                                />
-                            </div>
+                                    <div className="input-group">
+                                        <label>Artist</label>
+                                        <input
+                                            name="artist"
+                                            value={formData.artist}
+                                            onChange={handleChange}
+                                            placeholder="Ex: Pink Floyd"
+                                        />
+                                    </div>
 
-                            <div className="input-group">
-                                <label>An Lansare</label>
-                                <input
-                                    name="year"
-                                    type="number"
-                                    value={formData.year}
-                                    onChange={handleChange}
-                                    placeholder="Ex: 1973"
-                                />
-                            </div>
+                                    <div className="input-group">
+                                        <label>An Lansare</label>
+                                        <input
+                                            name="year"
+                                            type="number"
+                                            value={formData.year}
+                                            onChange={handleChange}
+                                            placeholder="Ex: 1973"
+                                        />
+                                    </div>
 
-                            <div className="input-group">
-                                <label>Țara</label>
-                                <select name="country" value={formData.country} onChange={(e) => { handleChange(e); handleCountryChange(e.target.value) }}>
-                                    <option value="">Selectează țara</option>
-                                    {
-                                        countries.length > 0 ? countries.map((v, i) => <option key={i} value={v.id}>{v.country}</option>)
-                                            :
-                                            <option disabled>Scanează un produs</option>
-                                    }
-                                </select>
-                            </div>
+                                    <div className="input-group">
+                                        <label>Țara</label>
+                                        <select name="country" value={formData.country} onChange={(e) => { handleChange(e); handleCountryChange(e.target.value) }}>
+                                            <option value="">Selectează țara</option>
+                                            {
+                                                countries.length > 0 ? countries.map((v, i) => <option key={i} value={v.id}>{v.country}</option>)
+                                                    :
+                                                    <option disabled>Scanează un produs</option>
+                                            }
+                                        </select>
+                                    </div>
 
-                            <div className="input-group">
-                                <label>Format</label>
-                                <select name="format" value={formData.format} onChange={handleChange}>
-                                    <option value="">Selectează format</option>
-                                    <option value="Vinyl">Vinil</option>
-                                    <option value="CD">CD</option>
-                                    <option value="Cassette">Casetă</option>
-                                    <option value="DVD">DVD</option>
-                                    <option value="Blu-ray">Blu-ray</option>
-                                </select>
-                            </div>
+                                    <div className="input-group">
+                                        <label>Format</label>
+                                        <select name="format" value={formData.format} onChange={handleChange}>
+                                            <option value="">Selectează format</option>
+                                            {
+                                                formats.map((v, i) => (<option key={i} value={v}>{v}</option>))
+                                            }
 
-                            {/* <div className="input-group col-span-2">
+
+                                        </select>
+                                    </div>
+                                    <div className="input-group">
+                                        <label>Stare copertă</label>
+                                        <select name="stare.coperta" value={formData.stare.coperta} onChange={handleChange}>
+                                            <option value="">Selectează gradația</option>
+                                            {
+                                                optiuni_stareCoperta.map((v, i) => (<option key={i} value={v}>{v}</option>))
+                                            }
+                                        </select>
+                                    </div>
+
+                                    <div className="input-group">
+                                        <label>Stare produs</label>
+                                        <select name="stare.coperta" value={formData.stare.disc} onChange={handleChange}>
+                                            <option value="">Selectează gradația</option>
+                                            {
+                                                optiuni_stareDisc.map((v, i) => (<option key={i} value={v}>{v}</option>))
+                                            }
+                                        </select>
+                                    </div>
+                                    <div className="input-group col-span-2">
+                                        <label>Descriere</label>
+                                        <textarea
+                                            name="description"
+                                            value={formData.description}
+                                            onChange={handleChange}
+                                            placeholder="Descriere..."
+                                            style={{ height: "10rem" }}
+                                        />
+                                    </div>
+
+                                    {/* <div className="input-group col-span-2">
                                 <label>URL Imagine</label>
                                 <div className="input-with-icon">
                                     <LucideImage className="icon" size={18} />
@@ -453,102 +543,103 @@ export default function Client() {
                                     />
                                 </div>
                             </div> */}
-                            <section className='imgSection'>
-                                <div style={{ position: 'relative' }}>
-                                    <img className='mainImage' src={formData.imageUrl[selectedImage] || "/assets/image.png"}
-                                        onTouchStart={handleTouchStart}
-                                        onTouchMove={handleTouchMove}
-                                        onTouchEnd={handleTouchEnd}
-                                    />
-                                    <div className="mobileMoreImagesIndicator">
-                                        <div className="dotsContainer">
-                                            {visibleDots.map((_, i) => {
-                                                const realIndex = start + i;
+                                    <section className='imgSection'>
+                                        <div style={{ position: 'relative' }}>
+                                            <img className='mainImage' src={formData.imageUrl[selectedImage] || "/noimg.png"}
+                                                onTouchStart={handleTouchStart}
+                                                onTouchMove={handleTouchMove}
+                                                onTouchEnd={handleTouchEnd}
+                                            />
+                                            <div className="mobileMoreImagesIndicator">
+                                                <div className="dotsContainer">
+                                                    {visibleDots.map((_, i) => {
+                                                        const realIndex = start + i;
 
-                                                return (
-                                                    <div
-                                                        key={realIndex}
-                                                        className={`
+                                                        return (
+                                                            <div
+                                                                key={realIndex}
+                                                                className={`
                     dot
                     ${selectedImage === realIndex ? "selected" : ""}
                     ${i === 0 || i === maxDots - 1 ? "edge" : ""}
                 `}
-                                                    />
-                                                );
-                                            })}
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
-                                <div className='moreImagesContainer'>
-                                    {
-                                        hasOverflow && (
-                                            <button onClick={scrollLeft} className="moreImagesBtn">
-                                                <FaChevronLeft />
-                                            </button>
-                                        )
-                                    }
+                                        <div className='moreImagesContainer'>
+                                            {
+                                                hasOverflow && (
+                                                    <button onClick={scrollLeft} className="moreImagesBtn">
+                                                        <FaChevronLeft />
+                                                    </button>
+                                                )
+                                            }
 
-                                    <div className={`moreImages ${hasOverflow ? "" : "nu"}`} ref={scrollRef} style={{ width: !hasOverflow ? "100%" : '90%' }}>
-                                        {
-                                            formData.imageUrl.map((v, i) => (
-                                                <img
-                                                    key={i}
-                                                    src={v || "/assets/image.png"}
-                                                    onClick={() => setSelectedImage(i)}
-                                                    className={selectedImage === i ? "selected" : ""}
-                                                />
-                                            ))
-                                        }
-                                    </div>
+                                            <div className={`moreImages ${hasOverflow ? "" : "nu"}`} ref={scrollRef} style={{ width: !hasOverflow ? "100%" : '90%' }}>
+                                                {
+                                                    formData.imageUrl.map((v, i) => (
+                                                        <img
+                                                            key={i}
+                                                            src={v || "/assets/image.png"}
+                                                            onClick={() => setSelectedImage(i)}
+                                                            className={selectedImage === i ? "selected" : ""}
+                                                        />
+                                                    ))
+                                                }
+                                            </div>
 
 
-                                    {
-                                        hasOverflow && (
-                                            <button onClick={scrollRight} className="moreImagesBtn">
-                                                <FaChevronRight />
-                                            </button>
-                                        )
-                                    }
+                                            {
+                                                hasOverflow && (
+                                                    <button onClick={scrollRight} className="moreImagesBtn">
+                                                        <FaChevronRight />
+                                                    </button>
+                                                )
+                                            }
+                                        </div>
+                                    </section>
                                 </div>
                             </section>
-                        </div>
-                    </section>
 
-                    <section className="form-section">
-                        <h2 className="section-title">Stoc & Preț</h2>
-                        <div className="grid-2-cols">
-                            <div className="input-group">
-                                <label>Preț (RON)</label>
-                                <input
-                                    name="price"
-                                    type="number"
-                                    value={formData.price}
-                                    onChange={handleChange}
-                                    placeholder="0.00"
-                                />
-                            </div>
-                            <div className="input-group">
-                                <label>Stoc inițial</label>
-                                <input
-                                    name="stock"
-                                    type="number"
-                                    value={formData.stock}
-                                    onChange={handleChange}
-                                    placeholder="0"
-                                />
-                            </div>
-                        </div>
-                    </section>
+                            <section className="form-section">
+                                <h2 className="section-title">Stoc & Preț</h2>
+                                <div className="grid-2-cols">
+                                    <div className="input-group">
+                                        <label>Preț (RON)</label>
+                                        <input
+                                            name="price"
+                                            type="number"
+                                            value={formData.price}
+                                            onChange={handleChange}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                    <div className="input-group">
+                                        <label>Stoc inițial</label>
+                                        <input
+                                            name="stock"
+                                            type="number"
+                                            value={formData.stock}
+                                            onChange={handleChange}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                </div>
+                            </section>
 
-                    <button type="submit" disabled={loading} className="btn-submit">
-                        {loading ? <div className="spinner" /> : (
-                            <>
-                                <LucideSave size={20} />
-                                SALVEAZĂ PRODUSUL
-                            </>
-                        )}
-                    </button>
-                </form>
+                            <button type="submit" disabled={loading} className="btn-submit">
+                                {loading ? <div className="spinner" /> : (
+                                    <>
+                                        <LucideSave size={20} />
+                                        SALVEAZĂ PRODUSUL
+                                    </>
+                                )}
+                            </button>
+                        </form>
+                }
 
                 {isScanning && (
                     <div className="scanner-overlay" onClick={() => setIsScanning(false)}>

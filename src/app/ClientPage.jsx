@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { GrStatusGoodSmall } from 'react-icons/gr';
 import { FaSearch } from 'react-icons/fa';
+import { Pagination } from '@/components/Pagination';
 
 const PAGE_SIZE = 20;
 
@@ -25,7 +26,7 @@ const filterValues = [
     'Minidisc', 'CDr',
     'Box Set', 'Cassette',
     'DVD', 'Blu-ray',
-    'SACD'
+    'SACD', "Mistery box"
 ]
 
 const ClientPage = () => {
@@ -50,12 +51,12 @@ const ClientPage = () => {
 
     const [searchRestored, setSearchRestored] = useState(false);
 
-    useEffect(() => {
-        if (searchRestored && searchTerm) {
-            fetchProducts(true, searchTerm);
-            setSearchRestored(false);
-        }
-    }, [searchRestored]);
+    const PAGE_SIZE_DISPLAY = 20;
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const paginatedProducts = products.slice(0, currentPage * PAGE_SIZE_DISPLAY);
+    const hasMore = paginatedProducts.length < products.length;
+
 
     useEffect(() => {
         const handleScroll = () => setScrollY(window.scrollY);
@@ -63,20 +64,21 @@ const ClientPage = () => {
         return () => window.removeEventListener("scroll", handleScroll);
     }, []);
 
-    useEffect(() => {
-        console.log(scrollY)
-    }, [scrollY])
+    useEffect(() => { console.log(overAllInfo) }, [overAllInfo])
+
 
 
 
     const CACHE_KEY = 'inventar_cache';
 
-    const saveCache = (products, lastVisibleId, isEnd, total) => {
+    const saveCache = (products, lastVisibleId, isEnd, total, cd, vinyl) => {
         sessionStorage.setItem(CACHE_KEY, JSON.stringify({
             products,
             lastVisibleId: lastVisibleId || null,
             isEnd,
-            total
+            total,
+            cd,
+            vinyl
         }));
     };
 
@@ -151,8 +153,14 @@ const ClientPage = () => {
             return;
         }
 
+        const savedPage = sessionStorage.getItem('inventar_page');
+        if (savedPage) {
+            setCurrentPage(Number(savedPage));
+            sessionStorage.removeItem('inventar_page');
+        }
+
         let attempts = 0;
-        const maxAttempts = 20; // max 1 secundă (20 × 50ms)
+        const maxAttempts = 40;
 
         const interval = setInterval(() => {
             const el = document.querySelector(`[data-product-id="${lastClickedId}"]`);
@@ -163,6 +171,7 @@ const ClientPage = () => {
                 el.scrollIntoView({ behavior: 'instant', block: 'center' });
                 sessionStorage.removeItem('inventar_lastClickedId');
                 sessionStorage.removeItem('inventar_scroll');
+                sessionStorage.removeItem('inventar_formatFilter');
             } else if (attempts >= maxAttempts) {
                 clearInterval(interval);
                 window.scrollTo(0, Number(savedScroll || 0));
@@ -176,18 +185,22 @@ const ClientPage = () => {
         const savedScroll = sessionStorage.getItem('inventar_scroll');
         const lastClickedId = sessionStorage.getItem('inventar_lastClickedId');
         const savedSearch = sessionStorage.getItem('inventar_search');
-
+        const savedFormatFilter = sessionStorage.getItem('inventar_formatFilter');
 
         if (cache) {
             let cd = 0;
             cache.products.map((v) => v.format === "CD" ? cd++ : {});
             setProducts(cache.products);
             setIsEnd(cache.isEnd);
-            setOverAllInfo({ total: cache.total, cd });
-
+            setOverAllInfo({ total: cache.total, cd: cache.cd, vinyl: cache.vinyl });
+            console.log({ total: cache.total, cd: cache.cd, vinyl: cache.vinyl }, cache)
             if (savedSearch) {
                 setSearchTerm(savedSearch);
                 setSearchRestored(true);
+            }
+            if (savedFormatFilter){
+                setFormatFilter(savedFormatFilter);
+                handleFilterChange(savedFormatFilter)
             }
 
             if (cache.lastVisibleId && !cache.isEnd) {
@@ -202,77 +215,29 @@ const ClientPage = () => {
         }
     }, []);
 
-    const fetchProducts = async (isInitial = false, search = "", filter = formatFilter) => {
+    const fetchProducts = async (isInitial = false) => {
         if (loading) return;
         setLoading(true);
 
         try {
             const productsRef = collection(db, "releases");
 
-            let total = overAllInfo.total;
-            let cd = overAllInfo.cd;
-            let vinyl = overAllInfo.vinyl;
+            const countSnapshot = await getCountFromServer(productsRef);
+            const cdSnapshot = await getCountFromServer(query(productsRef, where("format", "==", "CD")));
+            const vinylSnapshot = await getCountFromServer(query(productsRef, where("format", "==", "Vinyl")));
 
-            if (isInitial || search) {
-                const countSnapshot = await getCountFromServer(productsRef);
-                const cdSnapshot = await getCountFromServer(query(productsRef, where("format", "==", "CD")));
-                const vinylSnapshot = await getCountFromServer(query(productsRef, where("format", "==", "Vinyl")));
+            const total = countSnapshot.data().count;
+            const cd = cdSnapshot.data().count;
+            const vinyl = vinylSnapshot.data().count;
+            setOverAllInfo({ total, cd, vinyl });
 
-                total = countSnapshot.data().count;
-                cd = cdSnapshot.data().count;
-                vinyl = vinylSnapshot.data().count;
-                setOverAllInfo({ total, cd, vinyl });
-            }
+            const snap = await getDocs(query(productsRef, orderBy("artist_lowercase")));
+            const allProducts = snap.docs.map(d => ({ id: d.id, ...d.data(), inInventar: true }));
 
-            let newData = [];
-            let lastDoc = null;
+            setProducts(allProducts);
+            setIsEnd(true);
+            saveCache(allProducts, null, true, total, cd, vinyl);
 
-            if (search) {
-                const docRef = doc(db, "releases", search);
-                const docSnap = await getDoc(docRef);
-
-                if (docSnap.exists()) {
-                    newData = [{ id: docSnap.id, ...docSnap.data(), inInventar: true }];
-                    setIsEnd(true);
-                } else {
-                    const constraints = [
-                        orderBy("artist_lowercase"),
-                        where("artist_lowercase", ">=", search.toLowerCase()),
-                        where("artist_lowercase", "<=", search.toLowerCase() + "\uf8ff"),
-                        ...(filter !== "all" ? [where("format", "==", filter)] : []),
-                        limit(PAGE_SIZE)
-                    ];
-                    const q = query(productsRef, ...constraints);
-                    const snap = await getDocs(q);
-                    newData = snap.docs.map(d => ({ id: d.id, ...d.data(), inInventar: true }));
-                    lastDoc = snap.docs[snap.docs.length - 1];
-                    setIsEnd(snap.docs.length < PAGE_SIZE);
-                }
-
-                setProducts(newData);
-                setLastVisible(lastDoc);
-
-            } else {
-                const constraints = [
-                    orderBy("artist_lowercase"),
-                    ...(filter !== "all" ? [where("format", "==", filter)] : []),
-                    ...(isInitial ? [] : [startAfter(lastVisible)]),
-                    limit(PAGE_SIZE)
-                ];
-                const q = query(productsRef, ...constraints);
-
-                const snap = await getDocs(q);
-                newData = snap.docs.map(d => ({ id: d.id, ...d.data(), inInventar: true }));
-                lastDoc = snap.docs[snap.docs.length - 1];
-                const ended = snap.docs.length < PAGE_SIZE;
-
-                const updatedProducts = isInitial ? newData : [...products, ...newData];
-                setProducts(updatedProducts);
-                setLastVisible(lastDoc);
-                setIsEnd(ended);
-
-                saveCache(updatedProducts, lastDoc?.id || null, ended, total, cd, vinyl);
-            }
         } catch (error) {
             console.error("Eroare Firebase:", error);
         } finally {
@@ -280,11 +245,62 @@ const ClientPage = () => {
         }
     };
 
-    const handleSearch = (e) => {
+    const handleSearch = () => {
         sessionStorage.removeItem('inventar_search');
-        if (searchTerm.length >= 2 || searchTerm.length === 0) {
-            fetchProducts(true, searchTerm);
+        setCurrentPage(1);
+
+        const cache = loadCache();
+        if (!cache) {
+            fetchProducts();
+            return;
         }
+
+        let filtered = cache.products;
+
+        if (searchTerm.length >= 2) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(p =>
+                p.artist_lowercase?.includes(term) ||
+                p.title_lowercase?.includes(term) ||
+                String(p.id) === searchTerm
+            );
+        }
+
+        if (formatFilter !== 'all') {
+            filtered = filtered.filter(p => p.format === formatFilter);
+        }
+
+        setProducts(filtered);
+        setIsEnd(true);
+    };
+
+    const handleFilterChange = async (format) => {
+        setFormatFilter(format);
+        setCurrentPage(1);
+
+        const cache = await loadCache();
+        if (!cache) {
+            fetchProducts();
+            return;
+        }
+
+        const term = searchTerm.toLowerCase();
+
+        let filtered = cache.products;
+
+        if (searchTerm.length >= 2) {
+            filtered = filtered.filter(p =>
+                p.artist_lowercase?.includes(term) ||
+                p.title_lowercase?.includes(term) ||
+                String(p.id) === searchTerm
+            );
+        }
+        if (format !== 'all') {
+            filtered = filtered.filter(p => p.format === format);
+        }
+
+        setProducts(filtered);
+        setIsEnd(true);
     };
 
     const handleUpdatePrice = async (id, newPrice, newStock, e) => {
@@ -501,22 +517,17 @@ const ClientPage = () => {
         }
     };
 
-    // La salvare (în handleProductClick):
+
     const handleProductClick = (id) => {
         sessionStorage.setItem('inventar_scroll', window.scrollY);
         sessionStorage.setItem('inventar_lastClickedId', String(id));
-        sessionStorage.setItem('inventar_search', searchTerm); // ← add this
+        sessionStorage.setItem('inventar_search', searchTerm);
+        sessionStorage.setItem('inventar_page', currentPage);
+        sessionStorage.setItem('inventar_formatFilter', formatFilter);
         router.push(`/produs/${id}`);
     };
 
-    const handleFilterChange = (format) => {
-        setFormatFilter(format);
-        setLastVisible(null);
-        setIsEnd(false);
-        fetchProducts(true, searchTerm, format);
-    };
 
-    // if (!signedIn) return null;
 
     return (
         <div className='mainPage'>
@@ -598,7 +609,7 @@ const ClientPage = () => {
                     backgroundColor: '#f8fafc',
                     left: 0,
                     right: 0,
-                    padding: '2rem',
+                    padding: '1rem',
                     borderBottom: '#fff 1px solid'
                 }}>
                     <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
@@ -642,7 +653,7 @@ const ClientPage = () => {
             </div>
 
             <div className="products-list">
-                {products.map((p) => (
+                {products.slice((currentPage - 1) * PAGE_SIZE_DISPLAY, currentPage * PAGE_SIZE_DISPLAY).map((p) => (
                     <div
                         key={p.id}
                         className={`product-card ${!p.inInventar ? 'not-in-inventory' : ''}`}
@@ -721,13 +732,15 @@ const ClientPage = () => {
                         )}
                     </div>
                 ))}
-
-                {!isEnd && (
-                    <button className="load-more-btn" onClick={() => fetchProducts(false, searchTerm)}>
-                        {loading ? 'Se încarcă...' : 'Încarcă mai multe'}
-                    </button>
-                )}
             </div>
+            <Pagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(products.length / PAGE_SIZE_DISPLAY)}
+                onPageChange={(page) => {
+                    setCurrentPage(page);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+            />
 
             {/* MODAL SELECTIE */}
             {saleResults.length > 0 && (

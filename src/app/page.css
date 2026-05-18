@@ -161,9 +161,12 @@
 .format-filters {
     display: flex;
     gap: 0.5rem;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+
 }
 
-.format-filters-fixed{
+.format-filters-fixed {
     position: fixed;
     top: 1rem;
     z-index: 10;
@@ -182,6 +185,8 @@
     font-size: 0.875rem;
     transition: all 0.2s;
     color: #333;
+    min-height: 36px;
+    white-space: nowrap;
 }
 
 .filter-btn:hover {
@@ -216,12 +221,14 @@ input {
 
 .searchUsege {
     display: flex;
-    flex-direction: column-reverse;
-    align-items: flex-end;
-    width: 100%;
+    flex-direction: row;
+    width: max-content;
+    align-items: center;
+    /* width: 100%; */
     gap: .2rem;
 }
-.searchUsege button{
+
+.searchUsege button {
     padding: 0.5rem 1rem;
     border: 1px solid #ddd;
     border-radius: 20px;
@@ -234,6 +241,7 @@ input {
     align-items: center;
     justify-content: center;
 }
+
 .search-wrapper h3 {
     display: none;
 }
@@ -741,6 +749,11 @@ input {
     .topBtns {
         flex-direction: column;
     }
+
+    .search-wrapper {
+        display: flex;
+        flex-direction: column;
+    }
 }
 
 @media (min-width: 1024px) {
@@ -768,14 +781,11 @@ input {
         width: auto;
     }
 
+
     .search-wrapper h3 {
         display: block;
         font-size: 1.4rem;
     }
 
-    .searchUsege {
-        flex-direction: row;
-        width: max-content;
-        align-items: center;
-    }
+
 }

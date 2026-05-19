@@ -1,7 +1,6 @@
 'use client';
 import React, { useState } from 'react';
-import { auth, googleProvider } from '@/lib/firebase';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { supabase } from '@/lib/supabase';
 import './Login.css';
 import { FcGoogle } from 'react-icons/fc';
 import { useRouter } from 'next/navigation';
@@ -18,31 +17,37 @@ const Login = () => {
 
     const handleLogin = async (e) => {
         e.preventDefault();
+
         setError("");
 
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+
+            const { error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) throw error;
+
             router.push("/");
+
         } catch (error) {
-            switch (error.code) {
-                case "auth/invalid-credential":
+
+            switch (error.message) {
+
+                case "Invalid login credentials":
                     setError("Email sau parolă incorectă.");
                     break;
-                case "auth/user-not-found":
-                    setError("Nu există un cont cu acest email.");
+
+                case "Email not confirmed":
+                    setError("Email-ul nu este confirmat.");
                     break;
-                case "auth/wrong-password":
-                    setError("Parolă incorectă.");
-                    break;
-                case "auth/too-many-requests":
-                    setError("Prea multe încercări. Încearcă din nou mai târziu.");
-                    break;
-                case "auth/user-disabled":
-                    setError("Acest cont a fost dezactivat.");
-                    break;
+
                 default:
                     setError("A apărut o eroare. Încearcă din nou.");
             }
+
+            console.error(error);
         }
     };
 
@@ -50,15 +55,19 @@ const Login = () => {
 
         try {
 
-            await signInWithPopup(
-                auth,
-                googleProvider
-            );
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                },
+            });
 
-            router.push("/")
+            if (error) throw error;
 
         } catch (error) {
+
             console.error(error);
+
         }
     };
 

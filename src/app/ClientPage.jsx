@@ -16,6 +16,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { GrStatusGoodSmall } from 'react-icons/gr';
 import { FaSearch } from 'react-icons/fa';
 import { Pagination } from '@/components/Pagination';
+import { supabase } from '@/lib/supabase';
 
 const PAGE_SIZE = 20;
 
@@ -23,7 +24,7 @@ const PAGE_SIZE = 20;
 const filterValues = [
     'all',
     'CD', 'Vinyl',
-    'Minidisc', 'CDr',
+    'Minidisc',
     'Box Set', 'Cassette',
     'DVD', 'Blu-ray',
     'SACD', "Mistery box"
@@ -32,7 +33,6 @@ const filterValues = [
 const ClientPage = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [lastVisible, setLastVisible] = useState(null);
     const [isEnd, setIsEnd] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [overAllInfo, setOverAllInfo] = useState({ total: 0, cd: 0, vinyl: 0 });
@@ -54,8 +54,6 @@ const ClientPage = () => {
     const PAGE_SIZE_DISPLAY = 20;
     const [currentPage, setCurrentPage] = useState(1);
 
-    const paginatedProducts = products.slice(0, currentPage * PAGE_SIZE_DISPLAY);
-    const hasMore = paginatedProducts.length < products.length;
 
 
     useEffect(() => {
@@ -82,37 +80,51 @@ const ClientPage = () => {
         }));
     };
 
-    const loadCache = () => {
-        try {
-            const raw = sessionStorage.getItem(CACHE_KEY);
-            return raw ? JSON.parse(raw) : null;
-        } catch { return null; }
-    };
+
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            console.log(auth)
-            if (!user) {
 
+        const checkUser = async () => {
+
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!user) {
                 router.push('/login');
-            } else {
-                const userDocRef = doc(db, "users", user.uid);
-                const userDocSnap = await getDoc(userDocRef);
-                if (userDocSnap.exists()) {
-                    if (!userDocSnap.data().isAdmin) {
-                        auth.signOut();
-                        router.push('/login');
-                    } else {
-                        setSignedIn(true)
-                    }
-                } else {
-                    auth.signOut();
-                    router.push('/login');
-                }
+                return;
             }
+
+            const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('is_admin')
+                .eq('id', user.id)
+                .single();
+
+            if (error || !profile) {
+                await supabase.auth.signOut();
+                router.push('/login');
+                return;
+            }
+
+            if (!profile.is_admin) {
+                await supabase.auth.signOut();
+                router.push('/login');
+                return;
+            }
+
+            setSignedIn(true);
+        };
+
+        checkUser();
+
+        // optional: listen for changes
+        const { data: listener } = supabase.auth.onAuthStateChange(() => {
+            checkUser();
         });
 
-        return () => unsubscribe();
+        return () => {
+            listener?.subscription.unsubscribe();
+        };
+
     }, [router]);
 
     useEffect(() => {
@@ -181,142 +193,185 @@ const ClientPage = () => {
     };
 
     useEffect(() => {
-        const cache = loadCache();
-        const savedScroll = sessionStorage.getItem('inventar_scroll');
-        const lastClickedId = sessionStorage.getItem('inventar_lastClickedId');
-        const savedSearch = sessionStorage.getItem('inventar_search');
-        const savedFormatFilter = sessionStorage.getItem('inventar_formatFilter');
+        const savedSearch =
+            sessionStorage.getItem('inventar_search') || "";
 
-        if (cache) {
-            let cd = 0;
-            cache.products.map((v) => v.format === "CD" ? cd++ : {});
-            setProducts(cache.products);
-            setIsEnd(cache.isEnd);
-            setOverAllInfo({ total: cache.total, cd: cache.cd, vinyl: cache.vinyl });
-            console.log({ total: cache.total, cd: cache.cd, vinyl: cache.vinyl }, cache)
-            if (savedSearch) {
-                setSearchTerm(savedSearch);
-                setSearchRestored(true);
-            }
-            if (savedFormatFilter){
-                setFormatFilter(savedFormatFilter);
-                handleFilterChange(savedFormatFilter)
-            }
+        const savedFormatFilter =
+            sessionStorage.getItem('inventar_formatFilter') || "all";
 
-            if (cache.lastVisibleId && !cache.isEnd) {
-                getDoc(doc(db, "releases", cache.lastVisibleId)).then(snap => {
-                    if (snap.exists()) setLastVisible(snap);
+        const savedPage =
+            Number(sessionStorage.getItem('inventar_page')) || 1;
+
+        const savedScroll =
+            Number(sessionStorage.getItem('inventar_scroll')) || 0;
+
+        setSearchTerm(savedSearch);
+        setFormatFilter(savedFormatFilter);
+        setCurrentPage(savedPage);
+
+        fetchProducts(
+            savedPage,
+            savedSearch,
+            savedFormatFilter
+        ).then(() => {
+            setTimeout(() => {
+                window.scrollTo({
+                    top: savedScroll,
+                    behavior: 'instant'
                 });
-            }
+            }, 100);
+        });
 
-            restoreScroll(lastClickedId, savedScroll);
-        } else {
-            fetchProducts(true);
-        }
     }, []);
 
-    const fetchProducts = async (isInitial = false) => {
-        if (loading) return;
+
+
+    const fetchProducts = async (
+        page = 1,
+        search = "",
+        format = "all"
+    ) => {
         setLoading(true);
 
         try {
-            const productsRef = collection(db, "releases");
+            const from = (page - 1) * PAGE_SIZE;
+            const to = from + PAGE_SIZE - 1;
 
-            const countSnapshot = await getCountFromServer(productsRef);
-            const cdSnapshot = await getCountFromServer(query(productsRef, where("format", "==", "CD")));
-            const vinylSnapshot = await getCountFromServer(query(productsRef, where("format", "==", "Vinyl")));
+            // QUERY PRODUSE AFISATE
+            let query = supabase
+                .from('products')
+                .select('*')
+                .order('artist_lowercase', { ascending: true });
 
-            const total = countSnapshot.data().count;
-            const cd = cdSnapshot.data().count;
-            const vinyl = vinylSnapshot.data().count;
-            setOverAllInfo({ total, cd, vinyl });
+            // SEARCH
+            if (search.length >= 2) {
 
-            const snap = await getDocs(query(productsRef, orderBy("artist_lowercase")));
-            const allProducts = snap.docs.map(d => ({ id: d.id, ...d.data(), inInventar: true }));
+                const term = search.toLowerCase();
 
-            setProducts(allProducts);
-            setIsEnd(true);
-            saveCache(allProducts, null, true, total, cd, vinyl);
+                const isNumeric = !isNaN(search);
 
-        } catch (error) {
-            console.error("Eroare Firebase:", error);
+                if (isNumeric) {
+
+                    query = query.or(
+                        `artist_lowercase.ilike.%${term}%,title_lowercase.ilike.%${term}%,id.eq.${search}`
+                    );
+
+                } else {
+
+                    query = query.or(
+                        `artist_lowercase.ilike.%${term}%,title_lowercase.ilike.%${term}%`
+                    );
+
+                }
+            }
+
+            // FILTER
+            if (format !== 'all') {
+                query = query.eq('format', format);
+            }
+
+            // PAGINATION
+            query = query.range(from, to);
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+
+            // TOTAL TOATE PRODUSELE
+            const { count: totalCount } = await supabase
+                .from('products')
+                .select('*', {
+                    count: 'exact',
+                    head: true
+                });
+
+            // TOTAL CD
+            const { count: cdCount } = await supabase
+                .from('products')
+                .select('*', {
+                    count: 'exact',
+                    head: true
+                })
+                .eq('format', 'CD');
+
+            // TOTAL VINYL
+            const { count: vinylCount } = await supabase
+                .from('products')
+                .select('*', {
+                    count: 'exact',
+                    head: true
+                })
+                .eq('format', 'Vinyl');
+
+            const mappedProducts = (data || []).map((p) => ({
+                ...p,
+                inInventar: true
+            }));
+
+            setProducts(mappedProducts);
+
+            setOverAllInfo({
+                total: totalCount || 0,
+                cd: cdCount || 0,
+                vinyl: vinylCount || 0
+            });
+
+        } catch (err) {
+            console.error(err);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSearch = () => {
-        sessionStorage.removeItem('inventar_search');
-        setCurrentPage(1);
+    useEffect(() => {
 
-        const cache = loadCache();
-        if (!cache) {
-            fetchProducts();
-            return;
-        }
+        const timeout = setTimeout(() => {
 
-        let filtered = cache.products;
-
-        if (searchTerm.length >= 2) {
-            const term = searchTerm.toLowerCase();
-            filtered = filtered.filter(p =>
-                p.artist_lowercase?.includes(term) ||
-                p.title_lowercase?.includes(term) ||
-                String(p.id) === searchTerm
+            fetchProducts(
+                1,
+                searchTerm,
+                formatFilter
             );
-        }
 
-        if (formatFilter !== 'all') {
-            filtered = filtered.filter(p => p.format === formatFilter);
-        }
+            setCurrentPage(1);
 
-        setProducts(filtered);
-        setIsEnd(true);
-    };
+        }, 300);
+
+        return () => clearTimeout(timeout);
+
+    }, [searchTerm, formatFilter]);
 
     const handleFilterChange = async (format) => {
         setFormatFilter(format);
         setCurrentPage(1);
 
-        const cache = await loadCache();
-        if (!cache) {
-            fetchProducts();
-            return;
-        }
-
-        const term = searchTerm.toLowerCase();
-
-        let filtered = cache.products;
-
-        if (searchTerm.length >= 2) {
-            filtered = filtered.filter(p =>
-                p.artist_lowercase?.includes(term) ||
-                p.title_lowercase?.includes(term) ||
-                String(p.id) === searchTerm
-            );
-        }
-        if (format !== 'all') {
-            filtered = filtered.filter(p => p.format === format);
-        }
-
-        setProducts(filtered);
-        setIsEnd(true);
+        await fetchProducts(
+            1,
+            searchTerm,
+            format
+        );
     };
 
     const handleUpdatePrice = async (id, newPrice, newStock, e) => {
         e.stopPropagation();
         try {
-            await updateDoc(doc(db, "releases", String(id)), {
-                price: Number(newPrice),
-                stock: Number(newStock)
-            });
+            const { error } = await supabase
+                .from('products')
+                .update({
+                    price: Number(newPrice),
+                    stock: Number(newStock)
+                })
+                .eq('id', id);
+
+            if (error) throw error;
+
             setProducts(prev => {
                 const updated = prev.map(p =>
                     String(p.id) === String(id)
                         ? { ...p, price: Number(newPrice), stock: Number(newStock) }
                         : p
                 );
-                saveCache(updated, lastVisible?.id || null, isEnd, overAllInfo.total);
+                saveCache(updated, null, isEnd, overAllInfo.total, overAllInfo.cd, overAllInfo.vinyl);
                 return updated;
             });
             alert("Actualizat!");
@@ -341,7 +396,12 @@ const ClientPage = () => {
 
             const detailedResults = await Promise.all(
                 data.results.map(async (item) => {
-                    const fDoc = await getDoc(doc(db, "releases", String(item.id)));
+                    const { data: dbProduct } = await supabase
+                        .from('products')
+                        .select('stock, price')
+                        .eq('id', item.id)
+                        .single();
+
                     try {
                         const detailRes = await fetch(
                             `https://api.discogs.com/releases/${item.id}`,
@@ -356,17 +416,17 @@ const ClientPage = () => {
                         return {
                             id: item.id,
                             title: detail.title,
-                            format: item.formats[0].name,
+                            format: item.formats?.[0]?.name || "",
                             artist: detail.artists?.[0]?.name || "Necunoscut",
                             country: detail.country || "Necunoscută",
                             cover_image: detail.images?.[0]?.uri || null,
                             year: detail.year,
-                            inInventar: fDoc.exists(),
-                            stock: fDoc.exists() ? (fDoc.data().stock ?? 0) : 0,
-                            price: fDoc.exists() ? (fDoc.data().price ?? 0) : 0,
+                            inInventar: !!dbProduct,
+                            stock: dbProduct?.stock ?? 0,
+                            price: dbProduct?.price ?? 0,
                         };
                     } catch (err) {
-                        return item;
+                        return { ...item, inInventar: !!dbProduct };
                     }
                 })
             );
@@ -389,12 +449,18 @@ const ClientPage = () => {
         if (!confirmed) return;
 
         try {
-            await deleteDoc(doc(db, "releases", String(id)));
+            const { error } = await supabase
+                .from('products')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+
             setProducts(prev => {
                 const updated = prev.filter(p => String(p.id) !== String(id));
                 const newTotal = overAllInfo.total - 1;
-                setOverAllInfo({ total: newTotal });
-                saveCache(updated, lastVisible?.id || null, isEnd, newTotal);
+                setOverAllInfo(prev => ({ ...prev, total: newTotal }));
+                saveCache(updated, null, isEnd, newTotal, overAllInfo.cd, overAllInfo.vinyl);
                 return updated;
             });
         } catch (err) {
@@ -405,9 +471,13 @@ const ClientPage = () => {
     const handleAddToInventory = async (p, price, stock, e) => {
         e.stopPropagation();
         try {
-            const productRef = doc(db, "releases", String(p.id));
-            const existing = await getDoc(productRef);
-            if (existing.exists()) {
+            const { data: existing } = await supabase
+                .from('products')
+                .select('id')
+                .eq('id', p.id)
+                .single();
+
+            if (existing) {
                 alert("Produsul există deja în inventar!");
                 return;
             }
@@ -430,16 +500,27 @@ const ClientPage = () => {
                 price: Number(price) || 0,
                 stock: Number(stock) || 1,
                 date_added: new Date().toISOString(),
+                stare_coperta: "",
+                stare_disc: "",
+                oferta_activa: false,
+                oferta_procent: "",
+                oferta_data_start: new Date().toISOString().split('T')[0],
+                oferta_data_end: new Date().toISOString().split('T')[0],
             };
 
-            await setDoc(productRef, newProduct);
+            const { error } = await supabase
+                .from('products')
+                .insert(newProduct);
+
+            if (error) throw error;
+
             setProducts(prev => {
                 const updated = prev.map(prod =>
                     prod.id === p.id ? { ...prod, ...newProduct, inInventar: true } : prod
                 );
                 const newTotal = overAllInfo.total + 1;
-                setOverAllInfo({ total: newTotal });
-                saveCache(updated, lastVisible?.id || null, isEnd, newTotal);
+                setOverAllInfo(prev => ({ ...prev, total: newTotal }));
+                saveCache(updated, null, isEnd, newTotal, overAllInfo.cd, overAllInfo.vinyl);
                 return updated;
             });
             alert("Produs adăugat în inventar!");
@@ -470,7 +551,12 @@ const ClientPage = () => {
 
             const resultsWithStatus = await Promise.all(
                 data.results.map(async (item) => {
-                    const snap = await getDoc(doc(db, "releases", String(item.id)));
+                    const { data: dbProduct } = await supabase
+                        .from('products')
+                        .select('*')
+                        .eq('id', item.id)
+                        .single();
+
                     return {
                         id: item.id,
                         title: item.title,
@@ -478,8 +564,8 @@ const ClientPage = () => {
                         year: item.year,
                         format: item.formats?.[0]?.name || "",
                         cover_image: item.cover_image || null,
-                        inInventar: snap.exists(),
-                        ...(snap.exists() ? snap.data() : {})
+                        inInventar: !!dbProduct,
+                        ...(dbProduct || {})
                     };
                 })
             );
@@ -506,12 +592,41 @@ const ClientPage = () => {
 
         try {
             const newStock = saleProduct.stock - saleQuantity;
-            await updateDoc(doc(db, "releases", String(saleProduct.id)), { stock: newStock });
-            setProducts(prev => prev.map(p =>
-                String(p.id) === String(saleProduct.id) ? { ...p, stock: newStock } : p
-            ));
+
+            // UPDATE SUPABASE
+            const { error } = await supabase
+                .from('products')
+                .update({ stock: newStock })
+                .eq('id', saleProduct.id);
+
+            if (error) throw error;
+
+            // actualizare produse locale
+            setProducts(prev => {
+                const updated = prev.map(p =>
+                    String(p.id) === String(saleProduct.id)
+                        ? { ...p, stock: newStock }
+                        : p
+                );
+
+                // update cache
+                saveCache(
+                    updated,
+                    null,
+                    isEnd,
+                    overAllInfo.total,
+                    overAllInfo.cd,
+                    overAllInfo.vinyl
+                );
+
+                return updated;
+            });
+
+            // actualizare produs modal
             setSaleProduct(null);
+
             alert(`Vânzare înregistrată! Stoc rămas: ${newStock}`);
+
         } catch (err) {
             alert("Eroare: " + err.message);
         }
@@ -632,10 +747,9 @@ const ClientPage = () => {
                             placeholder="Caută produs..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                             className="search-input"
                         />
-                        <button type='submit' onClick={() => handleSearch()}><FaSearch /></button>
+                        {/* <button type='submit' onClick={() => handleSearch()}><FaSearch /></button> */}
                     </div>
                 </div>
 
@@ -645,15 +759,14 @@ const ClientPage = () => {
                         placeholder="Caută produs..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                         className="search-input"
                     />
-                    <button type='submit' onClick={() => handleSearch()}><FaSearch /></button>
+                    {/* <button type='submit' onClick={() => handleSearch()}><FaSearch /></button> */}
                 </div>
             </div>
 
             <div className="products-list">
-                {products.slice((currentPage - 1) * PAGE_SIZE_DISPLAY, currentPage * PAGE_SIZE_DISPLAY).map((p) => (
+                {products.map((p) => (
                     <div
                         key={p.id}
                         className={`product-card ${!p.inInventar ? 'not-in-inventory' : ''}`}
@@ -735,10 +848,20 @@ const ClientPage = () => {
             </div>
             <Pagination
                 currentPage={currentPage}
-                totalPages={Math.ceil(products.length / PAGE_SIZE_DISPLAY)}
-                onPageChange={(page) => {
+                totalPages={Math.ceil(overAllInfo.total / PAGE_SIZE)}
+                onPageChange={async (page) => {
                     setCurrentPage(page);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                    await fetchProducts(
+                        page,
+                        searchTerm,
+                        formatFilter
+                    );
+
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
                 }}
             />
 

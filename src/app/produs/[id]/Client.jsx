@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { doc, updateDoc, getDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import './produs.css';
 
@@ -112,25 +112,35 @@ export default function ProdusManagement({ id }) {
 
         const fetchProdus = async () => {
             try {
-                const snap = await getDoc(doc(db, 'releases', String(id)));
-                if (!snap.exists()) { setLoading(false); return; }
-                const data = { id: snap.id, ...snap.data() };
+                const { data, error } = await supabase
+                    .from('products')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
+
+                if (error || !data) {
+                    setLoading(false);
+                    return;
+                }
+
                 setProdus(data);
+
                 setFormData({
                     descriere: data.description ?? '',
                     price: data.price ?? 0,
                     stock: data.stock ?? 0,
                     stare: {
-                        coperta: data.stare?.coperta ?? '',
-                        disc: data.stare?.disc ?? '',
+                        coperta: data.stare_coperta ?? '',
+                        disc: data.stare_disc ?? '',
                     },
                     oferta: {
-                        activa: data.oferta?.activa || false,
-                        procent: data.oferta?.procent || '',
-                        dataStart: data.oferta?.dataStart || formattedToday,
-                        dataEnd: data.oferta?.dataEnd || formattedToday,
+                        activa: data.oferta_activa || false,
+                        procent: data.oferta_procent || '',
+                        dataStart: data.oferta_data_start || formattedToday,
+                        dataEnd: data.oferta_data_end || formattedToday,
                     },
                 });
+
             } catch (err) {
                 console.error(err);
             } finally {
@@ -146,23 +156,30 @@ export default function ProdusManagement({ id }) {
 
     const handleSave = async () => {
         setSaving(true);
+
         try {
-            await updateDoc(doc(db, 'releases', String(id)), {
-                price: Number(formData.price),
-                stock: Number(formData.stock),
-                description: formData.descriere,
-                stare: {
-                    coperta: formData.stare.coperta,
-                    disc: formData.stare.disc,
-                },
-                oferta: {
-                    activa: formData.oferta.activa,
-                    procent: Number(formData.oferta.procent) || 0,
-                    dataStart: formData.oferta.dataStart || '',
-                    dataEnd: formData.oferta.dataEnd || '',
-                },
-            });
+
+            const { error } = await supabase
+                .from('products')
+                .update({
+                    price: Number(formData.price),
+                    stock: Number(formData.stock),
+                    description: formData.descriere,
+
+                    stare_coperta: formData.stare.coperta,
+                    stare_disc: formData.stare.disc,
+
+                    oferta_activa: formData.oferta.activa,
+                    oferta_procent: Number(formData.oferta.procent) || 0,
+                    oferta_data_start: formData.oferta.dataStart || '',
+                    oferta_data_end: formData.oferta.dataEnd || '',
+                })
+                .eq('id', id);
+
+            if (error) throw error;
+
             alert('Salvat cu succes!');
+
         } catch (err) {
             alert('Eroare: ' + err.message);
         } finally {
@@ -174,10 +191,20 @@ export default function ProdusManagement({ id }) {
         const confirmed = window.confirm(
             `Ești sigur că vrei să ștergi complet "${produs.title}" de ${produs.artist}?\n\nAceastă acțiune este ireversibilă!`
         );
+
         if (!confirmed) return;
+
         try {
-            await deleteDoc(doc(db, 'releases', String(id)));
+
+            const { error } = await supabase
+                .from('products')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+
             router.push('/');
+
         } catch (err) {
             alert('Eroare la ștergere: ' + err.message);
         }
@@ -319,6 +346,9 @@ export default function ProdusManagement({ id }) {
                     <button className="pm-save" onClick={handleSave} disabled={saving}>
                         {saving ? 'Se salvează...' : 'Salvează modificările'}
                     </button>
+                    <button className="pm-delete" onClick={handleDelete}>
+                        🗑 Șterge produsul
+                    </button>
                 </div>
 
             </div>
@@ -329,6 +359,3 @@ export default function ProdusManagement({ id }) {
 
 
 
-{/* <button className="pm-delete" onClick={handleDelete}>
-                        🗑 Șterge produsul
-                    </button> */}

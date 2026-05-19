@@ -13,29 +13,37 @@ import { LucideBarcode, LucidePlus, LucideImage, LucideSave, LucideArrowLeft, Lu
 import './addprocuct.css'
 import BarcodeScanner from '@/components/BarcodeScanner';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import CreateMisteryBox from './createMisteryBox';
 
 const maxDots = 5;
 
 const formats = [
     'CD', 'Vinyl',
-    'Minidisc', 'CDr',
+    'Minidisc',
     'Box Set', 'Cassette',
     'DVD', 'Blu-ray',
     'SACD'
 ]
 
-const optiuni_stareCoperta = [
-    "VG",
-    "VG+",
-    "NM"
-]
+// const optiuni_stareCoperta = [
+//     "VG",
+//     "VG+",
+//     "NM"
+// ]
+const optiuni_stareCoperta = {
+    "CD": { label: "Stare carcasă", stare: ["Stare buna", "Stare foarte buna"] },
+    "Vinyl": { label: "Stare copertă", stare: ["G", "VG", "VG+", "NM"] },
+    'default': { label: "Stare carcasă", stare: ["Stare buna", "Stare foarte buna"] }
+}
 
-const optiuni_stareDisc = [
-    "Stare buna",
-    "Stare foarte buna",
-]
+
+
+const optiuni_stareDisc = {
+    "CD": { label: "Stare disc", stare: ["Stare buna", "Stare foarte buna"] },
+    "Vinyl": { label: "Stare vinil", stare: ["G", "VG", "VG+", "NM"] },
+    'default': { label: "Stare disc", stare: ["Stare buna", "Stare foarte buna"] }
+}
 
 
 
@@ -165,10 +173,14 @@ export default function Client() {
         setMessage({ type: 'info', text: 'Se salvează produsul...' });
 
         try {
-            const productRef = doc(db, 'releases', String(formData.id));
+            // Verifică dacă produsul există deja
+            const { data: existing } = await supabase
+                .from('products')
+                .select('id')
+                .eq('id', formData.id)
+                .single();
 
-            const checkDoc = await getDoc(productRef);
-            if (checkDoc.exists()) {
+            if (existing) {
                 setMessage({ type: 'error', text: 'Acest produs există deja în inventar!' });
                 setLoading(false);
                 return;
@@ -188,19 +200,27 @@ export default function Client() {
                 format_desc: formData.format,
                 price: Number(formData.price),
                 stock: Number(formData.stock),
-                cover_image: formData.imageUrl[0]?.replace(`/api/image-proxy?url=`, '')
+                cover_image: formData.imageUrl[0]
                     ? decodeURIComponent(formData.imageUrl[0].replace('/api/image-proxy?url=', ''))
                     : "",
                 thumb: formData.imageUrl[0] || "",
                 label: "",
                 genres: [],
                 styles: [],
-                description: formData.description,
                 date_added: new Date().toISOString(),
-                stare: formData.stare
+                stare_coperta: formData.stare.coperta,
+                stare_disc: formData.stare.disc,
+                oferta_activa: false,
+                oferta_procent: '',
+                oferta_data_start: new Date().toISOString().split('T')[0],
+                oferta_data_end: new Date().toISOString().split('T')[0],
             };
 
-            await setDoc(productRef, productData);
+            const { error } = await supabase
+                .from('products')
+                .insert(productData);
+
+            if (error) throw error;
 
             setMessage({ type: 'success', text: 'Produs adăugat cu succes!' });
             setFormData({
@@ -213,7 +233,9 @@ export default function Client() {
                 format: '',
                 price: '',
                 stock: '',
-                imageUrl: []
+                imageUrl: [],
+                description: '',
+                stare: { coperta: "", disc: "" }
             });
             setCountries([]);
             setSelectedImage(0);
@@ -279,7 +301,7 @@ export default function Client() {
             setFormData((prev) => ({
                 ...prev,
                 scannedId,
-                format: results[0].formats[0].name,
+                format: results[0]?.formats?.[0]?.name || "",
                 title: results[0].title,
                 imageUrl: data2.images.map((v) => `/api/image-proxy?url=${encodeURIComponent(v.uri)}`),
                 artist: data2.artists.map((v) => v.name).join(", "),
@@ -497,26 +519,24 @@ export default function Client() {
                                             {
                                                 formats.map((v, i) => (<option key={i} value={v}>{v}</option>))
                                             }
-
-
                                         </select>
                                     </div>
                                     <div className="input-group">
-                                        <label>Stare copertă</label>
+                                        <label>{(optiuni_stareCoperta[formData.format || "default"] ?? optiuni_stareCoperta["default"]).label}</label>
                                         <select name="stare.coperta" value={formData.stare.coperta} onChange={handleChange}>
                                             <option value="">Selectează gradația</option>
                                             {
-                                                optiuni_stareCoperta.map((v, i) => (<option key={i} value={v}>{v}</option>))
+                                                (optiuni_stareCoperta[formData.format || "default"] ?? optiuni_stareCoperta["default"]).stare.map((v, i) => (<option key={i} value={v}>{v}</option>))
                                             }
                                         </select>
                                     </div>
 
                                     <div className="input-group">
-                                        <label>Stare produs</label>
+                                        <label>{(optiuni_stareDisc[formData.format || "default"] ?? optiuni_stareDisc["default"]).label}</label>
                                         <select name="stare.coperta" value={formData.stare.disc} onChange={handleChange}>
                                             <option value="">Selectează gradația</option>
                                             {
-                                                optiuni_stareDisc.map((v, i) => (<option key={i} value={v}>{v}</option>))
+                                                (optiuni_stareDisc[formData.format || "default"] ?? optiuni_stareDisc["default"]).stare.map((v, i) => (<option key={i} value={v}>{v}</option>))
                                             }
                                         </select>
                                     </div>

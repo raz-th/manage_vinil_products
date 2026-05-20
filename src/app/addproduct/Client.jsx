@@ -15,6 +15,7 @@ import BarcodeScanner from '@/components/BarcodeScanner';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import CreateMisteryBox from './createMisteryBox';
+import { COUNTRIES_LIST } from '@/components/vars';
 
 const maxDots = 5;
 
@@ -32,19 +33,57 @@ const formats = [
 //     "NM"
 // ]
 const optiuni_stareCoperta = {
-    "CD": { label: "Stare carcasă", stare: ["Stare buna", "Stare foarte buna"] },
-    "Vinyl": { label: "Stare copertă", stare: ["G", "VG", "VG+", "NM"] },
-    'default': { label: "Stare carcasă", stare: ["Stare buna", "Stare foarte buna"] }
+    "cd": {
+        label: "Stare carcasă",
+        stare: [
+            "Stare buna",
+            "Stare foarte buna",
+        ]
+    },
+    "vinyl": {
+        label: "Stare copertă",
+        stare: [
+            "G",
+            "VG",
+            "VG+",
+            "EX",
+            "NM"
+        ]
+    },
+    "default": {
+        label: "Stare carcasă",
+        stare: [
+            "Stare buna",
+            "Stare foarte buna",
+        ]
+    },
 }
-
-
 
 const optiuni_stareDisc = {
-    "CD": { label: "Stare disc", stare: ["Stare buna", "Stare foarte buna"] },
-    "Vinyl": { label: "Stare vinil", stare: ["G", "VG", "VG+", "NM"] },
-    'default': { label: "Stare disc", stare: ["Stare buna", "Stare foarte buna"] }
+    "cd": {
+        label: "Stare disc",
+        stare: [
+            "Stare buna",
+            "Stare foarte buna",
+        ]
+    },
+    "vinyl": {
+        label: "Stare vinil",
+        stare: [
+            "VG",
+            "VG+",
+            "EX",
+            "NM"
+        ]
+    },
+    "default": {
+        label: "Stare disc",
+        stare: [
+            "Stare buna",
+            "Stare foarte buna",
+        ]
+    },
 }
-
 
 
 
@@ -321,27 +360,27 @@ export default function Client() {
 
     const handleCountryChange = async (id) => {
         console.log(id)
-        const res = await fetch(
-            `https://api.discogs.com/releases/${id}`,
-            {
-                headers: {
-                    Authorization: `Discogs token=${process.env.NEXT_PUBLIC_APP_DISCOGS_API_KEY}`,
-                    "User-Agent": "MyApp/1.0",
-                }
-            }
-        );
-        const data = await res.json();
-        console.log(data)
-        setSelectedImage(0);
-        setFormData((prev) => ({
-            ...prev,
-            title: data.title || "",
-            imageUrl: data.images.map((v) => `/api/image-proxy?url=${encodeURIComponent(v.uri)}`) || "",
-            artist: data.artists.map((v) => v.name).join(", ") || "",
-            year: data.year || "",
-            id: data.id,
-            // country: data.id
-        }))
+        // const res = await fetch(
+        //     `https://api.discogs.com/releases/${id}`,
+        //     {
+        //         headers: {
+        //             Authorization: `Discogs token=${process.env.NEXT_PUBLIC_APP_DISCOGS_API_KEY}`,
+        //             "User-Agent": "MyApp/1.0",
+        //         }
+        //     }
+        // );
+        // const data = await res.json();
+        // console.log(data)
+        // setSelectedImage(0);
+        // setFormData((prev) => ({
+        //     ...prev,
+        //     title: data.title || "",
+        //     imageUrl: data.images.map((v) => `/api/image-proxy?url=${encodeURIComponent(v.uri)}`) || "",
+        //     artist: data.artists.map((v) => v.name).join(", ") || "",
+        //     year: data.year || "",
+        //     id: data.id,
+        //     // country: data.id
+        // }))
     }
 
     const scrollLeft = () => {
@@ -502,14 +541,27 @@ export default function Client() {
 
                                     <div className="input-group">
                                         <label>Țara</label>
-                                        <select name="country" value={formData.country} onChange={(e) => { handleChange(e); handleCountryChange(e.target.value) }}>
-                                            <option value="">Selectează țara</option>
-                                            {
-                                                countries.length > 0 ? countries.map((v, i) => <option key={i} value={v.id}>{v.country}</option>)
-                                                    :
-                                                    <option disabled>Scanează un produs</option>
-                                            }
-                                        </select>
+
+                                        <input
+                                            type="text"
+                                            name="country"
+                                            list="countries-list"
+                                            placeholder="Selectează sau scrie țara"
+                                            value={formData.country}
+                                            onChange={(e) => {
+                                                handleChange(e);
+                                                handleCountryChange(e.target.value);
+                                            }}
+                                        />
+
+                                        <datalist id="countries-list">
+                                            {COUNTRIES_LIST.map((v, i) => (
+                                                <option
+                                                    key={i}
+                                                    value={v}
+                                                />
+                                            ))}
+                                        </datalist>
                                     </div>
 
                                     <div className="input-group">
@@ -521,25 +573,22 @@ export default function Client() {
                                             }
                                         </select>
                                     </div>
-                                    <div className="input-group">
-                                        <label>{(optiuni_stareCoperta[formData.format || "default"] ?? optiuni_stareCoperta["default"]).label}</label>
+
+                                    <div className="input-group ">
+                                        <label>{optiuni_stareCoperta[formData.format.toLowerCase()]?.label ?? optiuni_stareCoperta["default"].label}</label>
                                         <select name="stare.coperta" value={formData.stare.coperta} onChange={handleChange}>
                                             <option value="">Selectează gradația</option>
-                                            {
-                                                (optiuni_stareCoperta[formData.format || "default"] ?? optiuni_stareCoperta["default"]).stare.map((v, i) => (<option key={i} value={v}>{v}</option>))
-                                            }
+                                            {(optiuni_stareCoperta[formData.format.toLowerCase()] ?? optiuni_stareCoperta["default"]).stare.map((v, i) => <option key={i} value={v}>{v}</option>)}
+                                        </select>
+                                    </div>
+                                    <div className="input-group">
+                                        <label>{optiuni_stareDisc[formData.format.toLowerCase()]?.label ?? optiuni_stareDisc["default"].label}</label>
+                                        <select name="stare.disc" value={formData.stare.disc} onChange={handleChange}>
+                                            <option value="">Selectează gradația</option>
+                                            {(optiuni_stareDisc[formData.format.toLowerCase()] ?? optiuni_stareDisc["default"]).stare.map((v, i) => <option key={i} value={v}>{v}</option>)}
                                         </select>
                                     </div>
 
-                                    <div className="input-group">
-                                        <label>{(optiuni_stareDisc[formData.format || "default"] ?? optiuni_stareDisc["default"]).label}</label>
-                                        <select name="stare.coperta" value={formData.stare.disc} onChange={handleChange}>
-                                            <option value="">Selectează gradația</option>
-                                            {
-                                                (optiuni_stareDisc[formData.format || "default"] ?? optiuni_stareDisc["default"]).stare.map((v, i) => (<option key={i} value={v}>{v}</option>))
-                                            }
-                                        </select>
-                                    </div>
                                     <div className="input-group col-span-2">
                                         <label>Descriere</label>
                                         <textarea

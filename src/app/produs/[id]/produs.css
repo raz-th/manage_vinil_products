@@ -136,6 +136,8 @@
 .input-group label {
     font-size: 0.875rem;
     font-weight: 600;
+    color: #000;
+    text-transform: none;
 }
 
 input,

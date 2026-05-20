@@ -1,5 +1,11 @@
-import ClientPage from "./ClientPage";
+// app/page.js
+import { Suspense } from 'react';
+import ClientPage from './ClientPage';
 
-export default function Home() {
-  return (<ClientPage/>);
+export default function Page() {
+    return (
+        <Suspense fallback={null}>
+            <ClientPage />
+        </Suspense>
+    );
 }

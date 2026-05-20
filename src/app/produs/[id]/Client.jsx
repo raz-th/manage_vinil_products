@@ -4,17 +4,15 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import './produs.css';
+import { COUNTRIES_LIST } from '@/components/vars';
 
-// const optiuni_stareCoperta = [
-//     "VG",
-//     "VG+",
-//     "NM"
-// ]
-
-// const optiuni_stareDisc = [
-//     "Stare buna",
-//     "Stare foarte buna",
-// ]
+const formats = [
+    'CD', 'Vinyl',
+    'Minidisc',
+    'Box Set', 'Cassette',
+    'DVD', 'Blu-ray',
+    'SACD'
+]
 
 const optiuni_stareCoperta = {
     "cd": {
@@ -27,8 +25,10 @@ const optiuni_stareCoperta = {
     "vinyl": {
         label: "Stare copertă",
         stare: [
+            "G",
             "VG",
             "VG+",
+            "EX",
             "NM"
         ]
     },
@@ -54,6 +54,7 @@ const optiuni_stareDisc = {
         stare: [
             "VG",
             "VG+",
+            "EX",
             "NM"
         ]
     },
@@ -71,8 +72,14 @@ export default function ProdusManagement({ id }) {
     const [produs, setProdus] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [countries, setCountries] = useState([]);
 
     const [formData, setFormData] = useState({
+        title: '',
+        artist: '',
+        year: '',
+        country: '',
+        format: '',
         descriere: '',
         price: 0,
         stock: 0,
@@ -126,6 +133,11 @@ export default function ProdusManagement({ id }) {
                 setProdus(data);
 
                 setFormData({
+                    title: data.title ?? '',
+                    artist: data.artist ?? '',
+                    year: data.year ?? '',
+                    country: data.country ?? '',
+                    format: data.format ?? '',
                     descriere: data.description ?? '',
                     price: data.price ?? 0,
                     stock: data.stock ?? 0,
@@ -162,13 +174,18 @@ export default function ProdusManagement({ id }) {
             const { error } = await supabase
                 .from('products')
                 .update({
+                    title: formData.title,
+                    title_lowercase: formData.title.toLowerCase(),
+                    artist: formData.artist,
+                    artist_lowercase: formData.artist.toLowerCase(),
+                    year: Number(formData.year),
+                    country: formData.country,
+                    format: formData.format,
                     price: Number(formData.price),
                     stock: Number(formData.stock),
                     description: formData.descriere,
-
                     stare_coperta: formData.stare.coperta,
                     stare_disc: formData.stare.disc,
-
                     oferta_activa: formData.oferta.activa,
                     oferta_procent: Number(formData.oferta.procent) || 0,
                     oferta_data_start: formData.oferta.dataStart || '',
@@ -242,6 +259,73 @@ export default function ProdusManagement({ id }) {
 
                 <div className="pm-sections">
                     <section className="pm-section">
+                        <h2 className="section-title">Detalii Produs</h2>
+                        <div className="input-group col-span-2">
+                            <label>Titlu</label>
+                            <input
+                                name="title"
+                                value={formData.title}
+                                onChange={handleChange}
+                                placeholder="Ex: Dark Side of the Moon"
+                            />
+                        </div>
+                        <div className="grid-2-cols">
+                            <div className="input-group">
+                                <label>Artist</label>
+                                <input
+                                    name="artist"
+                                    value={formData.artist}
+                                    onChange={handleChange}
+                                    placeholder="Ex: Pink Floyd"
+                                />
+                            </div>
+
+                            <div className="input-group">
+                                <label>An Lansare</label>
+                                <input
+                                    name="year"
+                                    type="number"
+                                    value={formData.year}
+                                    onChange={handleChange}
+                                    placeholder="Ex: 1973"
+                                />
+                            </div>
+
+                            <div className="input-group">
+                                <label>Țara</label>
+
+                                <input
+                                    type="text"
+                                    name="country"
+                                    list="countries-list"
+                                    placeholder="Selectează sau scrie țara"
+                                    value={formData.country}
+                                    onChange={(e) => {
+                                        handleChange(e);
+                   
+                                    }}
+                                />
+
+                                <datalist id="countries-list">
+                                    {COUNTRIES_LIST.map((v, i) => (
+                                        <option
+                                            key={i}
+                                            value={v}
+                                        />
+                                    ))}
+                                </datalist>
+                            </div>
+
+                            <div className="input-group">
+                                <label>Format</label>
+                                <select name="format" value={formData.format} onChange={handleChange}>
+                                    <option value="">Selectează format</option>
+                                    {
+                                        formats.map((v, i) => (<option key={i} value={v}>{v}</option>))
+                                    }
+                                </select>
+                            </div>
+                        </div>
                         <div className="input-group col-span-2">
                             <label>Descriere</label>
                             <textarea
@@ -270,7 +354,6 @@ export default function ProdusManagement({ id }) {
                         </div>
 
                     </section>
-
                     <section className="pm-section">
                         <h2>Stoc & Preț</h2>
                         <div className="pm-grid">

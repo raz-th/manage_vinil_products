@@ -1,11 +1,6 @@
 'use client'
 import React, { useEffect, useState, useRef } from 'react';
-import {
-    collection, query, orderBy, limit, getDocs,
-    startAfter, updateDoc, doc, where, getDoc,
-    getCountFromServer, setDoc, deleteDoc
-} from 'firebase/firestore';
-
+import { useSearchParams, usePathname } from 'next/navigation';
 import "./page.css"
 import { auth, db } from '@/lib/firebase';
 import { CiBarcode } from 'react-icons/ci';
@@ -54,6 +49,9 @@ const ClientPage = () => {
     const PAGE_SIZE_DISPLAY = 20;
     const [currentPage, setCurrentPage] = useState(1);
 
+    const searchParams = useSearchParams();
+    const pathname = usePathname();
+
 
 
     useEffect(() => {
@@ -83,29 +81,23 @@ const ClientPage = () => {
 
 
     useEffect(() => {
+        let isMounted = true;
 
-        const checkUser = async () => {
-
-            const { data: { user } } = await supabase.auth.getUser();
-
-            if (!user) {
-                router.push('/login');
+        const checkUser = async (session) => {
+            if (!session?.user) {
+                if (isMounted) router.push('/login');
                 return;
             }
 
             const { data: profile, error } = await supabase
                 .from('profiles')
                 .select('is_admin')
-                .eq('id', user.id)
+                .eq('id', session.user.id)
                 .single();
 
-            if (error || !profile) {
-                await supabase.auth.signOut();
-                router.push('/login');
-                return;
-            }
+            if (!isMounted) return;
 
-            if (!profile.is_admin) {
+            if (error || !profile || !profile.is_admin) {
                 await supabase.auth.signOut();
                 router.push('/login');
                 return;
@@ -114,17 +106,20 @@ const ClientPage = () => {
             setSignedIn(true);
         };
 
-        checkUser();
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            (_event, session) => {
+                if (isMounted) checkUser(session);
+            }
+        );
 
-        // optional: listen for changes
-        const { data: listener } = supabase.auth.onAuthStateChange(() => {
-            checkUser();
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            checkUser(session);
         });
 
         return () => {
-            listener?.subscription.unsubscribe();
+            isMounted = false;
+            subscription.unsubscribe();
         };
-
     }, [router]);
 
     useEffect(() => {
@@ -158,71 +153,43 @@ const ClientPage = () => {
     }, [scanMode]);
 
 
-    const restoreScroll = (lastClickedId, savedScroll) => {
-        if (!lastClickedId) {
-            window.scrollTo(0, Number(savedScroll || 0));
-            sessionStorage.removeItem('inventar_scroll');
-            return;
-        }
 
-        const savedPage = sessionStorage.getItem('inventar_page');
-        if (savedPage) {
-            setCurrentPage(Number(savedPage));
-            sessionStorage.removeItem('inventar_page');
-        }
-
-        let attempts = 0;
-        const maxAttempts = 40;
-
-        const interval = setInterval(() => {
-            const el = document.querySelector(`[data-product-id="${lastClickedId}"]`);
-            attempts++;
-
-            if (el) {
-                clearInterval(interval);
-                el.scrollIntoView({ behavior: 'instant', block: 'center' });
-                sessionStorage.removeItem('inventar_lastClickedId');
-                sessionStorage.removeItem('inventar_scroll');
-                sessionStorage.removeItem('inventar_formatFilter');
-            } else if (attempts >= maxAttempts) {
-                clearInterval(interval);
-                window.scrollTo(0, Number(savedScroll || 0));
-                sessionStorage.removeItem('inventar_scroll');
-            }
-        }, 50);
-    };
+    const isInitialized = useRef(false);
 
     useEffect(() => {
-        const savedSearch =
-            sessionStorage.getItem('inventar_search') || "";
+        const page = Number(searchParams.get('page')) || 1;
+        const search = searchParams.get('search') || "";
+        const format = searchParams.get('format') || "all";
 
-        const savedFormatFilter =
-            sessionStorage.getItem('inventar_formatFilter') || "all";
+        // Sincronizează state-urile cu URL-ul
+        setSearchTerm(search);
+        setFormatFilter(format);
+        setCurrentPage(page);
 
-        const savedPage =
-            Number(sessionStorage.getItem('inventar_page')) || 1;
-
-        const savedScroll =
-            Number(sessionStorage.getItem('inventar_scroll')) || 0;
-
-        setSearchTerm(savedSearch);
-        setFormatFilter(savedFormatFilter);
-        setCurrentPage(savedPage);
-
-        fetchProducts(
-            savedPage,
-            savedSearch,
-            savedFormatFilter
-        ).then(() => {
+        fetchProducts(page, search, format).then(() => {
+            const savedScroll = Number(sessionStorage.getItem('inventar_scroll')) || 0;
             setTimeout(() => {
-                window.scrollTo({
-                    top: savedScroll,
-                    behavior: 'instant'
-                });
+                window.scrollTo({ top: savedScroll, behavior: 'instant' });
+                sessionStorage.removeItem('inventar_scroll');
             }, 100);
         });
 
-    }, []);
+    }, [searchParams]);
+
+    const updateURL = (search, format, page) => {
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (format && format !== 'all') params.set('format', format);
+        if (page && page > 1) params.set('page', String(page));
+
+        const newUrl = `${pathname}?${params.toString()}`;
+        const currentUrl = window.location.pathname + window.location.search;
+
+        if (newUrl === currentUrl) return;
+
+        router.replace(newUrl, { scroll: false });
+    };
+
 
 
 
@@ -323,33 +290,17 @@ const ClientPage = () => {
         }
     };
 
-    useEffect(() => {
 
-        const timeout = setTimeout(() => {
 
-            fetchProducts(
-                1,
-                searchTerm,
-                formatFilter
-            );
-
-            setCurrentPage(1);
-
-        }, 300);
-
-        return () => clearTimeout(timeout);
-
-    }, [searchTerm, formatFilter]);
-
-    const handleFilterChange = async (format) => {
-        setFormatFilter(format);
-        setCurrentPage(1);
-
-        await fetchProducts(
-            1,
-            searchTerm,
-            format
-        );
+    const handleFilterChange = (format) => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (format && format !== 'all') {
+            params.set('format', format);
+        } else {
+            params.delete('format');
+        }
+        params.delete('page');
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     };
 
     const handleUpdatePrice = async (id, newPrice, newStock, e) => {
@@ -635,10 +586,6 @@ const ClientPage = () => {
 
     const handleProductClick = (id) => {
         sessionStorage.setItem('inventar_scroll', window.scrollY);
-        sessionStorage.setItem('inventar_lastClickedId', String(id));
-        sessionStorage.setItem('inventar_search', searchTerm);
-        sessionStorage.setItem('inventar_page', currentPage);
-        sessionStorage.setItem('inventar_formatFilter', formatFilter);
         router.push(`/produs/${id}`);
     };
 
@@ -717,6 +664,7 @@ const ClientPage = () => {
                 </div>
                 <div style={{
                     display: scrollY > 350 ? 'flex' : 'none',
+                    flexDirection: 'column',
                     gap: '2rem',
                     position: 'fixed',
                     justifyContent: 'space-between',
@@ -726,31 +674,51 @@ const ClientPage = () => {
                     right: 0,
                     padding: '1rem',
                     borderBottom: '#fff 1px solid'
-                }}>
-                    <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                        <h3>Listă inventar</h3>
-                        <div className="format-filters">
-                            {
-                                filterValues.map((v, i) => (<button
-                                    className={`filter-btn ${formatFilter === v ? 'active' : ''}`}
-                                    onClick={() => handleFilterChange(v)}
-                                    key={i}
-                                >
-                                    {v === 'all' ? 'Toate' : v}
-                                </button>))
-                            }
+                }} className='scrollInv'>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h1>Gestionare inventar</h1>
+                        <div className='topBtns'>
+                            <a className="scan-btn-solid" href='/addproduct'>
+                                <IoAddCircleOutline size={25} />
+                                <span>Adaugă produse</span>
+                            </a>
+                            <button
+                                className={`scan-btn-solid ${scanMode === 'sale' ? 'active-mode' : ''}`}
+                                style={{ backgroundColor: scanMode === 'sale' ? "#8b0000" : "#333" }}
+                                onClick={() => setScanMode(prev => prev === 'sale' ? 'search' : 'sale')}
+                            >
+                                <CiBarcode size={25} />
+                                <span>{scanMode === 'sale' ? '● Mod Vânzare' : 'Vânzare'}</span>
+                            </button>
                         </div>
                     </div>
-                    <div className='searchUsege'>
-                        <input
-                            type="text"
-                            placeholder="Caută produs..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="search-input"
-                        />
-                        {/* <button type='submit' onClick={() => handleSearch()}><FaSearch /></button> */}
+                    <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+                            <h3>Listă inventar</h3>
+                            <div className="format-filters">
+                                {
+                                    filterValues.map((v, i) => (<button
+                                        className={`filter-btn ${formatFilter === v ? 'active' : ''}`}
+                                        onClick={() => handleFilterChange(v)}
+                                        key={i}
+                                    >
+                                        {v === 'all' ? 'Toate' : v}
+                                    </button>))
+                                }
+                            </div>
+                        </div>
+                        <div className='searchUsege'>
+                            <input
+                                type="text"
+                                placeholder="Caută produs..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="search-input"
+                            />
+                            {/* <button type='submit' onClick={() => handleSearch()}><FaSearch /></button> */}
+                        </div>
                     </div>
+
                 </div>
 
                 <div className='searchUsege'>
@@ -849,19 +817,15 @@ const ClientPage = () => {
             <Pagination
                 currentPage={currentPage}
                 totalPages={Math.ceil(overAllInfo.total / PAGE_SIZE)}
-                onPageChange={async (page) => {
-                    setCurrentPage(page);
-
-                    await fetchProducts(
-                        page,
-                        searchTerm,
-                        formatFilter
-                    );
-
-                    window.scrollTo({
-                        top: 0,
-                        behavior: 'smooth'
-                    });
+                onPageChange={(page) => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    if (page > 1) {
+                        params.set('page', String(page));
+                    } else {
+                        params.delete('page');
+                    }
+                    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
             />
 

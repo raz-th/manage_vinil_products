@@ -1,31 +1,36 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
-import {
-    collection,
-    addDoc,
-    doc,
-    setDoc,
-    getDoc
-} from 'firebase/firestore';
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
 import { LucideBarcode, LucidePlus, LucideImage, LucideSave, LucideArrowLeft, LucideGlobe, LucideFingerprint } from 'lucide-react';
 import './addprocuct.css'
 import BarcodeScanner from '@/components/BarcodeScanner';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { supabase } from '@/lib/supabase';
 import CreateMisteryBox from './createMisteryBox';
-import { COUNTRIES_LIST } from '@/components/vars';
+import Select from 'react-select';
+import { COUNTRIES_LIST, formats, GENRES_LIST, STYLES_LIST } from '@/components/vars';
+import CreatableSelect from 'react-select/creatable';
 
 const maxDots = 5;
 
-const formats = [
-    'CD', 'Vinyl',
-    'Minidisc',
-    'Box Set', 'Cassette',
-    'DVD', 'Blu-ray',
-    'SACD'
-]
+const genresOptions = GENRES_LIST.map(g => ({
+    value: g,
+    label: g
+}));
+
+const stylesOptions = STYLES_LIST.map(s => ({
+    value: s,
+    label: s
+}));
+
+const countriesOptions = COUNTRIES_LIST.map(c => ({
+    value: c,
+    label: c
+}));
+
+const formatOptions = formats.map(f => ({
+    value: f,
+    label: f
+}))
 
 // const optiuni_stareCoperta = [
 //     "VG",
@@ -85,12 +90,14 @@ const optiuni_stareDisc = {
     },
 }
 
+const generateId = () => Math.floor(Math.random() * 9_000_000_000) + 1_000_000_000;
+
 
 
 
 export default function Client() {
     const [formData, setFormData] = useState({
-        id: 'xxxxxxx',
+        id: null,
         scannedId: '',
         title: '',
         artist: '',
@@ -99,12 +106,17 @@ export default function Client() {
         format: '',
         price: '',
         stock: '',
-        imageUrl: [],
         description: '',
         stare: {
             coperta: "",
             disc: ""
-        }
+        },
+        genres: [],
+        styles: [],
+        label: '',
+        images: [],
+        barcode: '',
+        discogsId: ''
     });
     const [hasOverflow, setHasOverflow] = useState(false);
     const scrollRef = useRef(null);
@@ -117,10 +129,21 @@ export default function Client() {
     const [isScanning, setIsScanning] = useState(false);
     const [countries, setCountries] = useState([]);
 
+    const [otherDatas, setOtherDatas] = useState([])
+
     const barcodeBuffer = useRef('');
     const barcodeTimeout = useRef(null);
 
     const [isMisteryBox, setIsMisteryBox] = useState(false);
+    const discogsInputRef = useRef(null);
+
+    useEffect(() => {
+        setFormData(prev => ({
+            ...prev,
+            id: prev.id ?? generateId()
+        }));
+    }, []);
+
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -229,20 +252,21 @@ export default function Client() {
 
             const productData = {
                 id: formData.id,
+                discogsId: formData.discogsId,
                 title: formData.title,
                 title_lowercase: formData.title.toLowerCase(),
                 artist: formData.artist,
                 artist_lowercase: formData.artist.toLowerCase(),
                 year: Number(formData.year) || 0,
-                country: selectedCountry?.country || "",
+                country: formData.country || "",
                 format: formData.format,
                 format_desc: formData.format,
                 price: Number(formData.price),
                 stock: Number(formData.stock),
-                cover_image: formData.imageUrl[0]
-                    ? decodeURIComponent(formData.imageUrl[0].replace('/api/image-proxy?url=', ''))
+                cover_image: formData.images[0]
+                    ? decodeURIComponent(formData.images[0].replace('/api/image-proxy?url=', ''))
                     : "",
-                thumb: formData.imageUrl[0] || "",
+                thumb: formData.images[0] || "",
                 label: "",
                 genres: [],
                 styles: [],
@@ -253,6 +277,13 @@ export default function Client() {
                 oferta_procent: '',
                 oferta_data_start: new Date().toISOString().split('T')[0],
                 oferta_data_end: new Date().toISOString().split('T')[0],
+                genres: formData.genres,
+                styles: formData.styles,
+                label: formData.label,
+                images: formData.images,
+                barcode: formData.barcode,
+                description: formData.description,
+                date_modified: new Date().toISOString(),
             };
 
             const { error } = await supabase
@@ -263,7 +294,7 @@ export default function Client() {
 
             setMessage({ type: 'success', text: 'Produs adăugat cu succes!' });
             setFormData({
-                id: 'xxxxxxx',
+                id: generateId(),
                 scannedId: '',
                 title: '',
                 artist: '',
@@ -272,9 +303,13 @@ export default function Client() {
                 format: '',
                 price: '',
                 stock: '',
-                imageUrl: [],
                 description: '',
-                stare: { coperta: "", disc: "" }
+                stare: { coperta: "", disc: "" },
+                genres: [],
+                styles: [],
+                label: '',
+                images: [],
+                barcode: ''
             });
             setCountries([]);
             setSelectedImage(0);
@@ -287,7 +322,7 @@ export default function Client() {
         }
     };
 
-    const total = formData.imageUrl.length;
+    const total = formData.images?.length || 0;
 
     let start = 0;
 
@@ -303,7 +338,7 @@ export default function Client() {
         }
     }
 
-    const visibleDots = formData.imageUrl.slice(start, start + maxDots);
+    const visibleDots = formData.images?.slice(start, start + maxDots);
 
     const handleScanner = async (scannedId) => {
         console.log("HANDLE CALLED:", scannedId);
@@ -326,36 +361,92 @@ export default function Client() {
                 setIsScanning(false);
                 return;
             }
-            const res2 = await fetch(
-                `https://api.discogs.com/releases/${results[0].id}`,
-                {
-                    headers: {
-                        Authorization: `Discogs token=${process.env.NEXT_PUBLIC_APP_DISCOGS_API_KEY}`,
-                        "User-Agent": "MyApp/1.0",
-                    }
-                }
+
+            const allReleases = await Promise.all(
+                results.slice(0, 5).map((v) =>
+                    fetch(`/api/release/${v.id}`).then((r) => r.json())
+                )
             );
-            const data2 = await res2.json();
-            console.log(results, data2)
+
+            const temp_imgs = allReleases.map((d, i) => ({
+                images: d.images?.map((img) => `/api/image-proxy?url=${encodeURIComponent(img.uri)}`) || [],
+                id: d.id,
+                country: d.country
+            }));
+            setOtherDatas(temp_imgs);
+
+            const data2 = allReleases[0];
+
             setFormData((prev) => ({
                 ...prev,
                 scannedId,
                 format: results[0]?.formats?.[0]?.name || "",
                 title: results[0].title,
-                imageUrl: data2.images.map((v) => `/api/image-proxy?url=${encodeURIComponent(v.uri)}`),
-                artist: data2.artists.map((v) => v.name).join(", "),
+                artist: data2.artists?.map((v) => v.name).join(", ") || "",
                 year: results[0].year,
-                id: data2.id,
-                country: results[0].id
-            }))
+                id: generateId(),
+                discogsId: data2.id,
+                country: results[0].country,
+                genres: data2.genres || [],
+                styles: data2.styles || [],
+                label: data2.labels?.map((v) => v.name).join(", ") || "",
+                images: temp_imgs[0]?.images || [],
+                barcode: scannedId
+            }));
+
             setCountries(results.map((v) => ({ id: v.id, country: v.country })));
-            // console.log(countries)
+            setMessage({ type: '', text: '' });
 
         } catch (err) {
             console.error(err);
         }
 
         setIsScanning(false);
+    };
+
+    const handleFetchVariants = async (query) => {
+        if (!query) return;
+        try {
+            // Try barcode first, fall back to title search
+            const isBarcode = /^\d+$/.test(query);
+            const searchUrl = isBarcode
+                ? `https://api.discogs.com/database/search?barcode=${query}`
+                : `https://api.discogs.com/database/search?q=${encodeURIComponent(query)}&type=release`;
+
+            const res = await fetch(searchUrl, {
+                headers: {
+                    Authorization: `Discogs token=${process.env.NEXT_PUBLIC_APP_DISCOGS_API_KEY}`,
+                    "User-Agent": "MyApp/1.0",
+                }
+            });
+            const data = await res.json();
+            const results = data.results.filter((a) => a.country === formData.country);
+            // console.log(data)
+            if (!results?.length) { alert('Nu s-au găsit rezultate pe Discogs! Verifică țara setată!'); return; }
+
+            const allReleases = await Promise.all(
+                results.slice(0, 20).map((v) =>
+                    fetch(`/api/release/${v.id}`).then((r) => r.json())
+                )
+            );
+
+            const temp_imgs = allReleases.map((d) => ({
+                images: d.images?.map((img) => `/api/image-proxy?url=${encodeURIComponent(img.uri)}`) || [],
+                id: d.id,
+                country: d.country
+            }));
+
+            setOtherDatas(temp_imgs);
+            setFormData(prev => ({
+                ...prev,
+                images: temp_imgs[0]?.images || [],
+                discogsId: temp_imgs[0]?.id || prev.discogsId
+            }));
+            setSelectedImage(0);
+        } catch (err) {
+            console.error(err);
+            alert('Eroare la fetch Discogs: ' + err.message);
+        }
     };
 
     const handleCountryChange = async (id) => {
@@ -415,7 +506,7 @@ export default function Client() {
 
         if (distance > minSwipeDistance) { //in stanga
             setSelectedImage((prev) =>
-                prev < formData.imageUrl.length - 1 ? prev + 1 : prev
+                prev < formData.images.length - 1 ? prev + 1 : prev
             );
         } else if (distance < -minSwipeDistance) { //in dreapta
             setSelectedImage((prev) =>
@@ -542,36 +633,107 @@ export default function Client() {
                                     <div className="input-group">
                                         <label>Țara</label>
 
-                                        <input
-                                            type="text"
-                                            name="country"
-                                            list="countries-list"
-                                            placeholder="Selectează sau scrie țara"
-                                            value={formData.country}
-                                            onChange={(e) => {
-                                                handleChange(e);
-                                                handleCountryChange(e.target.value);
+                                        <Select
+                                            instanceId="country-select"
+                                            inputId="country-select"
+                                            options={countriesOptions}
+                                            placeholder="Selectează țara..."
+                                            value={
+                                                countriesOptions.find(
+                                                    option => option.value === formData.country
+                                                ) || null
+                                            }
+                                            onChange={(selected) => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    country: selected?.value || ""
+                                                }));
                                             }}
+                                            classNamePrefix="music-select"
                                         />
-
-                                        <datalist id="countries-list">
-                                            {COUNTRIES_LIST.map((v, i) => (
-                                                <option
-                                                    key={i}
-                                                    value={v}
-                                                />
-                                            ))}
-                                        </datalist>
                                     </div>
 
                                     <div className="input-group">
                                         <label>Format</label>
-                                        <select name="format" value={formData.format} onChange={handleChange}>
-                                            <option value="">Selectează format</option>
-                                            {
-                                                formats.map((v, i) => (<option key={i} value={v}>{v}</option>))
+
+                                        <Select
+                                            instanceId="format-select"
+                                            inputId="format-select"
+                                            options={formatOptions}
+                                            placeholder="Selectează format..."
+                                            value={
+                                                formatOptions.find(
+                                                    option => option.value === formData.format
+                                                ) || null
                                             }
-                                        </select>
+                                            onChange={(selected) => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    format: selected?.value || ""
+                                                }));
+                                            }}
+                                            classNamePrefix="music-select"
+                                        />
+                                    </div>
+
+                                    <div className="input-group col-span-2">
+                                        <label>Casa de discuri</label>
+                                        <input
+                                            name="label"
+                                            value={formData.label}
+                                            onChange={handleChange}
+                                            placeholder="Ex: Harvest"
+                                        />
+                                    </div>
+
+                                    <div className="input-group col-span-2">
+                                        <label>Genuri muzicale</label>
+
+                                        <Select
+                                            instanceId="genres-select"
+                                            inputId="genres-select"
+                                            isMulti
+                                            options={genresOptions}
+                                            placeholder="Selectează genuri..."
+                                            value={genresOptions.filter(option =>
+                                                formData.genres.includes(option.value)
+                                            )}
+                                            onChange={(selected) => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    genres: selected.map(v => v.value)
+                                                }));
+                                            }}
+                                            classNamePrefix="music-select"
+                                        />
+                                    </div>
+
+                                    <div className="input-group col-span-2">
+                                        <label>Stiluri muzicale</label>
+
+                                        <CreatableSelect
+                                            instanceId="styles-select"
+                                            inputId="styles-select"
+                                            isMulti
+                                            options={stylesOptions}
+                                            placeholder="Selectează stiluri..."
+                                            value={stylesOptions
+                                                .filter(option => formData.styles.includes(option.value))
+                                                .concat(
+                                                    formData.styles
+                                                        .filter(v => !stylesOptions.some(o => o.value === v))
+                                                        .map(v => ({ value: v, label: v }))
+                                                )
+                                            }
+                                            onChange={(selected) => {
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    styles: selected.map(v => v.value)
+                                                }));
+                                            }}
+                                            classNamePrefix="music-select"
+                                            formatCreateLabel={(inputValue) => `Adaugă "${inputValue}"`}
+                                        />
                                     </div>
 
                                     <div className="input-group ">
@@ -612,9 +774,33 @@ export default function Client() {
                                     />
                                 </div>
                             </div> */}
-                                    <section className='imgSection'>
+                                    <div className="input-group col-span-2">
+                                        <label>Imagini</label>
+                                        <div className="input-with-button">
+                                            <input
+                                                ref={discogsInputRef}
+                                                placeholder="Barcode, release ID sau nume artist/album..."
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        handleFetchVariants(discogsInputRef.current?.value?.trim());
+                                                    }
+                                                }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => handleFetchVariants(discogsInputRef.current?.value?.trim())}
+                                                className="btn-icon btn-black"
+                                            >
+                                                Caută
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <section className='imgSection col-span-2'>
                                         <div style={{ position: 'relative' }}>
-                                            <img className='mainImage' src={formData.imageUrl[selectedImage] || "/noimg.png"}
+                                            <img
+                                                className='mainImage'
+                                                src={formData.images?.[selectedImage] || "/noimg.png"}
                                                 onTouchStart={handleTouchStart}
                                                 onTouchMove={handleTouchMove}
                                                 onTouchEnd={handleTouchEnd}
@@ -623,15 +809,10 @@ export default function Client() {
                                                 <div className="dotsContainer">
                                                     {visibleDots.map((_, i) => {
                                                         const realIndex = start + i;
-
                                                         return (
                                                             <div
                                                                 key={realIndex}
-                                                                className={`
-                    dot
-                    ${selectedImage === realIndex ? "selected" : ""}
-                    ${i === 0 || i === maxDots - 1 ? "edge" : ""}
-                `}
+                                                                className={`dot ${selectedImage === realIndex ? "selected" : ""} ${i === 0 || i === maxDots - 1 ? "edge" : ""}`}
                                                             />
                                                         );
                                                     })}
@@ -639,37 +820,51 @@ export default function Client() {
                                             </div>
                                         </div>
                                         <div className='moreImagesContainer'>
-                                            {
-                                                hasOverflow && (
-                                                    <button onClick={scrollLeft} className="moreImagesBtn">
-                                                        <FaChevronLeft />
-                                                    </button>
-                                                )
-                                            }
-
-                                            <div className={`moreImages ${hasOverflow ? "" : "nu"}`} ref={scrollRef} style={{ width: !hasOverflow ? "100%" : '90%' }}>
-                                                {
-                                                    formData.imageUrl.map((v, i) => (
-                                                        <img
-                                                            key={i}
-                                                            src={v || "/assets/image.png"}
-                                                            onClick={() => setSelectedImage(i)}
-                                                            className={selectedImage === i ? "selected" : ""}
-                                                        />
-                                                    ))
-                                                }
+                                            {hasOverflow && (
+                                                <button type="button" onClick={() => scrollRef.current?.scrollBy({ left: -100, behavior: "smooth" })} className="moreImagesBtn">
+                                                    <FaChevronLeft />
+                                                </button>
+                                            )}
+                                            <div
+                                                className={`moreImages ${hasOverflow ? "" : "nu"}`}
+                                                ref={scrollRef}
+                                                style={{ width: !hasOverflow ? "100%" : '90%' }}
+                                            >
+                                                {formData.images?.map((v, i) => (
+                                                    <img
+                                                        key={i}
+                                                        src={v || "/assets/image.png"}
+                                                        onClick={() => setSelectedImage(i)}
+                                                        className={selectedImage === i ? "selected" : ""}
+                                                    />
+                                                ))}
                                             </div>
-
-
-                                            {
-                                                hasOverflow && (
-                                                    <button onClick={scrollRight} className="moreImagesBtn">
-                                                        <FaChevronRight />
-                                                    </button>
-                                                )
-                                            }
+                                            {hasOverflow && (
+                                                <button type="button" onClick={() => scrollRef.current?.scrollBy({ left: 100, behavior: "smooth" })} className="moreImagesBtn">
+                                                    <FaChevronRight />
+                                                </button>
+                                            )}
                                         </div>
                                     </section>
+                                    <div className='buttonsForVariante col-span-2'>
+                                        {otherDatas.map((v, i) => (
+                                            <button
+                                                type="button"
+                                                key={i}
+                                                onClick={() => {
+                                                    setFormData(prev => ({
+                                                        ...prev,
+                                                        images: otherDatas[i].images,
+                                                        discogsId: otherDatas[i].id
+                                                    }));
+                                                    setSelectedImage(0);
+                                                }}
+                                                style={String(formData.id) === String(otherDatas[i].id) ? { backgroundColor: 'green', color: 'white' } : {}}
+                                            >
+                                                {i + 1}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </section>
 

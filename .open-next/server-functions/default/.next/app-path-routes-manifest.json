@@ -1,0 +1,12 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/addproduct/page": "/addproduct",
+  "/api/image-proxy/route": "/api/image-proxy",
+  "/api/release/[id]/route": "/api/release/[id]",
+  "/auth/callback/route": "/auth/callback",
+  "/barcode/page": "/barcode",
+  "/login/page": "/login",
+  "/page": "/",
+  "/produs/[id]/page": "/produs/[id]"
+}

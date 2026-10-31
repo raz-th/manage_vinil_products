@@ -1,7 +1,7 @@
+'use client';
 import { useState, useRef } from "react";
 import { LucidePackage, LucideSave, LucideTrash2, LucideBarcode, LucidePlus } from "lucide-react";
-import { collection, addDoc, serverTimestamp, doc, getDoc, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase"; // Updated import
 import "./createMisteryBox.css"
 
 const INITIAL_FORM = {
@@ -27,7 +27,6 @@ export default function CreateMisteryBox() {
     const handleScan = async (barcode) => {
         if (!barcode.trim() || barcode.trim().length < 3) return;
 
-
         const existing = scannedProducts.find(p => p.scannedId === barcode.trim());
         if (existing) {
             setScannedProducts(prev =>
@@ -42,7 +41,7 @@ export default function CreateMisteryBox() {
         }
 
         try {
-            // 1. Discogs lookup
+            // Discogs lookup
             const res = await fetch(
                 `https://api.discogs.com/database/search?barcode=${barcode.trim()}`,
                 {
@@ -56,28 +55,29 @@ export default function CreateMisteryBox() {
             const result = data.results?.[0];
             const discogsId = result?.id ?? null;
 
-
             let stock = null;
-            let firestoreDocId = null;
+            let dbId = null;
 
             if (discogsId) {
-                const snap = await getDocs(
-                    query(
-                        collection(db, "releases"),
-                        where("discogsId", "==", discogsId)
-                    )
-                );
-                if (!snap.empty) {
-                    const docData = snap.docs[0].data();
-                    firestoreDocId = snap.docs[0].id;
-                    stock = docData.stock ?? null;
+                // Supabase SELECT query
+                const { data: snap, error } = await supabase
+                    .from("releases")
+                    .select("id, stock")
+                    .eq("discogsId", discogsId)
+                    .limit(1);
+
+                if (error) {
+                    console.error("Supabase fetch error:", error);
+                } else if (snap && snap.length > 0) {
+                    dbId = snap[0].id;
+                    stock = snap[0].stock ?? null;
                 }
             }
 
             setScannedProducts(prev => [...prev, {
                 scannedId: barcode.trim(),
                 discogsId,
-                firestoreDocId,
+                dbId,
                 stock,
                 title: result?.title ?? "Produs necunoscut",
                 imageUrl: result?.cover_image ?? null,
@@ -89,7 +89,7 @@ export default function CreateMisteryBox() {
             setScannedProducts(prev => [...prev, {
                 scannedId: barcode.trim(),
                 discogsId: null,
-                firestoreDocId: null,
+                dbId: null,
                 stock: null,
                 title: "Produs necunoscut",
                 imageUrl: null,
@@ -116,6 +116,7 @@ export default function CreateMisteryBox() {
             })
         );
     };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.title.trim()) {
@@ -129,14 +130,21 @@ export default function CreateMisteryBox() {
 
         setLoading(true);
         try {
-            await addDoc(collection(db, "mistery_boxes"), {
-                title: formData.title.trim(),
-                price: parseFloat(formData.price) || 0,
-                description: formData.description.trim(),
-                quantity: parseInt(formData.quantity) || 1,
-                products: scannedProducts,
-                createdAt: serverTimestamp(),
-            });
+            // Supabase INSERT query
+            const { error } = await supabase
+                .from("mistery_boxes")
+                .insert([{
+                    title: formData.title.trim(),
+                    price: parseFloat(formData.price) || 0,
+                    description: formData.description.trim(),
+                    quantity: parseInt(formData.quantity) || 1,
+                    products: scannedProducts,
+                    // If your Supabase table has a default `now()` for `createdAt`, you don't need to pass it.
+                    // Otherwise, you can use: createdAt: new Date().toISOString()
+                }]);
+
+            if (error) throw error;
+
             setMessage({ text: "Mistery Box salvat cu succes!", type: "success" });
             setFormData(INITIAL_FORM);
             setScannedProducts([]);
@@ -148,10 +156,8 @@ export default function CreateMisteryBox() {
         }
     };
 
-
     return (
         <form onSubmit={handleSubmit} className="product-form">
-
             {/* IDENTIFICARE BOX */}
             <section className="form-section">
                 <h2 className="section-title">Detalii Mistery Box</h2>
@@ -240,18 +246,6 @@ export default function CreateMisteryBox() {
                             <div>
                                 <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                                     <span className="mb-product-title">{p.title}</span>
-                                    {/* {p.firestoreDocId === null && (
-                                        <a
-                                            href={`/products/new?barcode=${p.scannedId}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="mb-not-in-db-badge"
-                                            title="Produs inexistent în bază de date"
-                                        >
-                                            <LucideAlertTriangle size={12} />
-                                            Adaugă
-                                        </a>
-                                    )} */}
                                 </div>
                                 <span className="mb-product-sub">
                                     {p.scannedId}

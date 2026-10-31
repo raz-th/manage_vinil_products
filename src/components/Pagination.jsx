@@ -1,6 +1,5 @@
 import "./pagination.css"
 export const Pagination = ({ currentPage, totalPages, onPageChange }) => {
-    if (totalPages <= 1) return null;
 
     const getPages = () => {
         const pages = [];

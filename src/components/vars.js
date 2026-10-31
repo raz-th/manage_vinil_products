@@ -1,4 +1,59 @@
+export const formats = [
+    'CD', 'Vinyl',
+    'Minidisc',
+    'Box Set', 'Cassette',
+    'DVD', 'Blu-ray',
+    'SACD'
+]
+
+export const GENRES_LIST = [
+    "Rock",
+    "Jazz",
+    "Funk / Soul",
+    "Hip Hop",
+    "Classical",
+    "Electronic",
+    "Stage & Screen",
+    "Folk, World, & Country",
+    "Pop",
+    "Children's"
+];
+
+export const STYLES_LIST = [
+    // Rock
+    "Classic Rock", "Hard Rock", "Punk", "Alternative Rock", "Indie Rock", "Progressive Rock", "Psychedelic Rock", "Grunge", "Metal", "Heavy Metal", "Soft Rock", "Glam",
+    
+    // Jazz & Blues
+    "Blues", "Jazz", "Bebop", "Soul-Jazz", "Jazz-Funk", "Free Jazz", "Smooth Jazz", "Contemporary Jazz", "Rhythm & Blues", "Chicago Blues", "Delta Blues",
+    
+    // Soul & Funk
+    "Soul", "Funk", "Motown", "Disco", "Neo Soul", "Gospel", "R&B",
+    
+    // Hip-Hop
+    "Hip Hop", "Rap", "Trap", "Boom Bap", "Gangsta", "Trip Hop",
+    
+    // Clasică
+    "Romantic", "Baroque", "Modern", "Contemporary", "Opera", "Symphony", "Chamber Music", "Choral", "Renaissance",
+    
+    // Electronică
+    "House", "Techno", "Trance", "Ambient", "Drum n Bass", "Electro", "Synthpop", "Industrial", "IDM", "Dubstep", "Downtempo", "EBM",
+    
+    // Soundtracks
+    "Soundtrack", "Score", "Musical", "Theme", "Film Score",
+    
+    // Muzică Românească
+    "Romanian", "Balkan", "Folk", "Lăutărească", "Manele", "Muzică Populară",
+    
+    // Pop
+    "Synth-pop", "Dance-pop", "Europop", "Ballad", "Teen Pop", "Bubblegum",
+    
+    // Copii
+    "Educational", "Nursery Rhymes", "Story", "Cartoon"
+];
+
 export const COUNTRIES_LIST = [
+    "UK",
+    "US",
     "Europa",
     "Afghanistan",
     "Albania",
@@ -161,8 +216,6 @@ export const COUNTRIES_LIST = [
     "Uganda",
     "Ukraine",
     "United Arab Emirates",
-    "United Kingdom",
-    "United States",
     "Uruguay",
     "USSR",
     "Uzbekistan",

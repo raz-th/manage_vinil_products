@@ -2,12 +2,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, usePathname } from 'next/navigation';
 import "./page.css"
-import { auth, db } from '@/lib/firebase';
 import { CiBarcode } from 'react-icons/ci';
 import { IoAddCircleOutline } from 'react-icons/io5';
 import { MdDelete } from 'react-icons/md';
 import { useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
 import { GrStatusGoodSmall } from 'react-icons/gr';
 import { FaSearch } from 'react-icons/fa';
 import { Pagination } from '@/components/Pagination';
@@ -25,6 +23,8 @@ const filterValues = [
     'SACD', "Mistery box"
 ]
 
+const generateId = () => Math.floor(Math.random() * 9_000_000_000) + 1_000_000_000;
+
 const ClientPage = () => {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -41,6 +41,7 @@ const ClientPage = () => {
     const [formatFilter, setFormatFilter] = useState("all");
     const barcodeBuffer = useRef('');
     const barcodeTimeout = useRef(null);
+    const [filteredTotal, setFilteredTotal] = useState(0);
 
     const [scrollY, setScrollY] = useState(0);
 
@@ -153,9 +154,6 @@ const ClientPage = () => {
     }, [scanMode]);
 
 
-
-    const isInitialized = useRef(false);
-
     useEffect(() => {
         const page = Number(searchParams.get('page')) || 1;
         const search = searchParams.get('search') || "";
@@ -176,20 +174,29 @@ const ClientPage = () => {
 
     }, [searchParams]);
 
-    const updateURL = (search, format, page) => {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (format && format !== 'all') params.set('format', format);
-        if (page && page > 1) params.set('page', String(page));
+    const handleSearchChange = (value) => {
 
-        const newUrl = `${pathname}?${params.toString()}`;
-        const currentUrl = window.location.pathname + window.location.search;
+        setSearchTerm(value);
 
-        if (newUrl === currentUrl) return;
+        const params = new URLSearchParams(searchParams.toString());
 
-        router.replace(newUrl, { scroll: false });
+        if (value.trim().length >= 2) {
+
+            params.set('search', value);
+
+        } else {
+
+            params.delete('search');
+
+        }
+
+        // reset page cand cauti
+        params.delete('page');
+
+        router.replace(`${pathname}?${params.toString()}`, {
+            scroll: false
+        });
     };
-
 
 
 
@@ -201,20 +208,17 @@ const ClientPage = () => {
         setLoading(true);
 
         try {
+
             const from = (page - 1) * PAGE_SIZE;
             const to = from + PAGE_SIZE - 1;
 
-            // QUERY PRODUSE AFISATE
             let query = supabase
                 .from('products')
                 .select('*')
                 .order('artist_lowercase', { ascending: true });
-
-            // SEARCH
             if (search.length >= 2) {
 
                 const term = search.toLowerCase();
-
                 const isNumeric = !isNaN(search);
 
                 if (isNumeric) {
@@ -231,20 +235,54 @@ const ClientPage = () => {
 
                 }
             }
-
-            // FILTER
             if (format !== 'all') {
                 query = query.eq('format', format);
             }
 
-            // PAGINATION
             query = query.range(from, to);
 
             const { data, error } = await query;
 
             if (error) throw error;
 
-            // TOTAL TOATE PRODUSELE
+
+            let countQuery = supabase
+                .from('products')
+                .select('*', {
+                    count: 'exact',
+                    head: true
+                });
+
+            // SEARCH COUNT
+            if (search.length >= 2) {
+
+                const term = search.toLowerCase();
+                const isNumeric = !isNaN(search);
+
+                if (isNumeric) {
+
+                    countQuery = countQuery.or(
+                        `artist_lowercase.ilike.%${term}%,title_lowercase.ilike.%${term}%,id.eq.${search}`
+                    );
+
+                } else {
+
+                    countQuery = countQuery.or(
+                        `artist_lowercase.ilike.%${term}%,title_lowercase.ilike.%${term}%`
+                    );
+
+                }
+            }
+
+            // FILTER COUNT
+            if (format !== 'all') {
+                countQuery = countQuery.eq('format', format);
+            }
+
+            const { count: filteredCount } = await countQuery;
+
+            setFilteredTotal(filteredCount || 0);
+
             const { count: totalCount } = await supabase
                 .from('products')
                 .select('*', {
@@ -252,7 +290,6 @@ const ClientPage = () => {
                     head: true
                 });
 
-            // TOTAL CD
             const { count: cdCount } = await supabase
                 .from('products')
                 .select('*', {
@@ -261,7 +298,7 @@ const ClientPage = () => {
                 })
                 .eq('format', 'CD');
 
-            // TOTAL VINYL
+
             const { count: vinylCount } = await supabase
                 .from('products')
                 .select('*', {
@@ -276,6 +313,7 @@ const ClientPage = () => {
             }));
 
             setProducts(mappedProducts);
+            console.log(mappedProducts[0])
 
             setOverAllInfo({
                 total: totalCount || 0,
@@ -284,9 +322,13 @@ const ClientPage = () => {
             });
 
         } catch (err) {
+
             console.error(err);
+
         } finally {
+
             setLoading(false);
+
         }
     };
 
@@ -350,7 +392,7 @@ const ClientPage = () => {
                     const { data: dbProduct } = await supabase
                         .from('products')
                         .select('stock, price')
-                        .eq('id', item.id)
+                        .eq('discogsId', item.id)
                         .single();
 
                     try {
@@ -434,7 +476,8 @@ const ClientPage = () => {
             }
 
             const newProduct = {
-                id: p.id,
+                id: generateId(),
+                discogsId: p.id,
                 title: p.title || "",
                 title_lowercase: (p.title || "").toLowerCase(),
                 artist: p.artist || "Artist necunoscut",
@@ -589,6 +632,24 @@ const ClientPage = () => {
         router.push(`/produs/${id}`);
     };
 
+    const handleToggleVisibility = async (id, isVisible) => {
+        try {
+            const { error } = await supabase
+                .from('products')
+                .update({ visible: isVisible })
+                .eq('id', id);
+
+            if (error) throw error;
+
+            setProducts(prev => prev.map(p =>
+                String(p.id) === String(id) ? { ...p, visible: isVisible } : p
+            ));
+
+        } catch (err) {
+            alert("Eroare la actualizare: " + err.message);
+        }
+    };
+
 
 
     return (
@@ -712,7 +773,7 @@ const ClientPage = () => {
                                 type="text"
                                 placeholder="Caută produs..."
                                 value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                                onChange={(e) => { setSearchTerm(e.target.value); handleSearchChange(e.target.value) }}
                                 className="search-input"
                             />
                             {/* <button type='submit' onClick={() => handleSearch()}><FaSearch /></button> */}
@@ -726,7 +787,7 @@ const ClientPage = () => {
                         type="text"
                         placeholder="Caută produs..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => { setSearchTerm(e.target.value); handleSearchChange(e.target.value) }}
                         className="search-input"
                     />
                     {/* <button type='submit' onClick={() => handleSearch()}><FaSearch /></button> */}
@@ -770,6 +831,19 @@ const ClientPage = () => {
 
                         {p.inInventar ? (
                             <div className="product-controls" onClick={e => e.stopPropagation()}>
+                                <div className="input-group checkbox-group">
+                                    <label>Vizibil pe site</label>
+                                    <div className='switch_container'>
+                                        <label className="switch">
+                                            <input
+                                                type="checkbox"
+                                                checked={!!p.visible}
+                                                onChange={(e) => handleToggleVisibility(p.id, e.target.checked)}
+                                            />
+                                            <span className="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
                                 <div className="input-group">
                                     <label>Stoc</label>
                                     <input type="number" defaultValue={String(p.stock ?? 0)} id={`stock-${p.id}`} />
@@ -788,6 +862,7 @@ const ClientPage = () => {
                                 <button className="delete-btn" onClick={(e) => handleDeleteProduct(p.id, e)}>
                                     <MdDelete />
                                 </button>
+
                             </div>
                         ) : (
                             <div className="product-controls" onClick={e => e.stopPropagation()}>
@@ -816,16 +891,24 @@ const ClientPage = () => {
             </div>
             <Pagination
                 currentPage={currentPage}
-                totalPages={Math.ceil(overAllInfo.total / PAGE_SIZE)}
+                totalPages={Math.ceil(filteredTotal / PAGE_SIZE)}
                 onPageChange={(page) => {
                     const params = new URLSearchParams(searchParams.toString());
+
                     if (page > 1) {
                         params.set('page', String(page));
                     } else {
                         params.delete('page');
                     }
-                    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                    router.replace(`${pathname}?${params.toString()}`, {
+                        scroll: false
+                    });
+
+                    window.scrollTo({
+                        top: 0,
+                        behavior: 'smooth'
+                    });
                 }}
             />
 

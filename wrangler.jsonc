@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vinil-admin",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets"
+  },
+  "vars": {
+    "FIREBASE_CLIENT_EMAIL": "firebase-adminsdk-fbsvc@magazin-viniluri.iam.gserviceaccount.com",
+    "FIREBASE_PRIVATE_KEY": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC+MYYYgnZyw9e+\nlVkP2tj9tfThfhRAPg7BttLajkPJBkBOf3AWGd+ZbwUioLwTGCJAt1RKvijbPsY6\nY+oAy/rkAJEZKt+o7w4wjDFC09XXzBUGQg1quaXM/fJXtOkdcd8hVfxfU/k6kQAz\n3jn36SWP0QvC3PJDLQm22gQBIeyVEmoKksmCPgd8QP+5dtfXYIX3gOwM2iaXwqbg\n7cxoeL4eo9rmCE7nTvCG89wV1ciLevVIgSjvcu3PnNDjh0TIZRI1XSTBsI1KVjCg\nfaAnxG+fEINAIZjN8Em8V69VpRBxPJfAg0echmkwD4vD4w8jdYQeV+DOqVgEO2xZ\nwfwW/fk7AgMBAAECggEATCOPRyiTOoZkTAuFx+8Yhxjcm5jZio5NYgdKiewB/uvd\nuo8R1AcvmED1kVM/d3Vl4PqDaBiQSpTqzl1JRGBkY/pGHAkp2Hs69vxojBQ5u1Yb\n5JF0xZDkaxgOeEYYPI1lgfbmPVNkpql9p0YDdteDDfvl9XB2G6ZgCS9mAv4Ns+8m\niCTpA0lDlVS5FEpl1bXRoJr+3o/yi1YfiU5n2zWgux3iUktaFiWG4oNPcCaEU7Zr\nnk6oLNTbmPmM6Xe7WbYd/79PaAIxb5pZnJ97zHcsHhGf0HAymMZaOwBWHuEhWJgS\nnJVPHYCUHo+UV9hu4TJ0GvSuPXcUSbw57UzkOovMIQKBgQDg+Smp3BEktjBY5cgd\nOnx1pa/SgSqcryKsg7Yw6RBSgD79s327E99+2TYPnhqhxPn3LyFARkJIP0WFexve\nWllbksXvSPTy4oYlr+cFoEfukLbUctEYF6ZGfAc5pD/JxmgI0re8ua5BcDbjQcZl\nY2IKsx8GmOb4VaHa3soVwjhNvwKBgQDYbG9Rcy3zYBNmOMa2PYsKwO4avYn7EIvj\na3u+OAvDUAjbAo6ECwSvnpOCgq30XZBCjR3OZgI8R/ew23mFZ+dXCBiGT2JToECs\nJSbHEDg7/9BlDbbjhwOclpXYQJDy5DDpbxB5GZFgoAAg7CZa5KJuAhsPgScsCXUe\nA4INXfGrhQKBgCMUVv3IddfenL1P3xtHol6J3leZknZqDKMPypnnzYa/vpK6qTFB\nkQjrf7WBtq9g0oVLkQi/q9guHX4JyzepqONRiJGeM6unzLkVq5VB/9VgNVH9MUNr\ndJ7q+glv5g5lZJVznfjMjzJe+AAJopDupTv74CucLe+tEpbZRHOOHE9rAoGBAMkE\nrsCwgtWzP1GLGsbakvMCECa2NhsEW2p4ww8Db6mSBSenUEhFE60rVUe7qWd4IC4w\ndKbpCNqE3gNfV5gZ0j58PotB4Mpb5rX+K+5pmlHgYef6vQzIswoWtEeQcRGp8eRg\nTKSuouFku7nYnid+hYA4ZHoaNBArGKUwDPPtdjMhAoGBAKmfvxGQl95GC7I5TuDT\n/lNJacyV0MkqUqR5CfcrCpM0OxM9hmqaLYLGWMTFkN2omH1HC5vity5+vQkkgJQi\n+TFuqceBWASHLTHlE/7sfOG4B6QHVku1A0Djvbie8ivjshDbw/cTqJkFR5cnd0Ps\nvANgb67H0/R/8FzJsbxdKbvV\n-----END PRIVATE KEY-----",
+    "FIREBASE_PROJECT_ID": "magazin-viniluri",
+    "NEXT_PUBLIC_APP_DISCOGS_API_KEY": "MYSwramyTZLfnuDgWfwAqgZvBdVoECAhbVgLzfmA",
+    "NEXT_PUBLIC_APP_FIREBASE_API_KEY": "AIzaSyDq0gTsfhHu8QvB3-_A2mIkG5S-h8kWlS8",
+    "NEXT_PUBLIC_APP_FIREBASE_APP_ID": "1:449064949244:web:42f0cea425f0062aecce79",
+    "NEXT_PUBLIC_APP_FIREBASE_AUTH_DOMAIN": "magazin-viniluri.firebaseapp.com",
+    "NEXT_PUBLIC_APP_FIREBASE_MEASUREMENT_ID": "G-VXQE50J6ZZ",
+    "NEXT_PUBLIC_APP_FIREBASE_MESSAGING_SENDER_ID": "449064949244",
+    "NEXT_PUBLIC_APP_FIREBASE_PROJECT_ID": "magazin-viniluri",
+    "NEXT_PUBLIC_APP_FIREBASE_STORAGE_BUCKET": "magazin-viniluri.firebasestorage.app",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Mo9MQGOZ3y0wIcJXTFZ8YQ_63FljiZV",
+    "NEXT_PUBLIC_SUPABASE_URL": "https://ndsjagxakzjuniavktgn.supabase.co"
+  },
+}

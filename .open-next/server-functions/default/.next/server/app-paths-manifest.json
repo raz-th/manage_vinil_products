@@ -1,0 +1,12 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/addproduct/page": "app/addproduct/page.js",
+  "/api/image-proxy/route": "app/api/image-proxy/route.js",
+  "/api/release/[id]/route": "app/api/release/[id]/route.js",
+  "/auth/callback/route": "app/auth/callback/route.js",
+  "/barcode/page": "app/barcode/page.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
+  "/produs/[id]/page": "app/produs/[id]/page.js"
+}

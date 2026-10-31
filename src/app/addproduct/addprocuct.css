@@ -10,7 +10,7 @@
     --info: #3b82f6;
 }
 
-*{
+* {
     /* border: red 2px solid; */
 }
 
@@ -100,45 +100,45 @@
 }
 
 .radio-inputs {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  border-radius: 0.5rem;
-  background-color: #ffffff;
-  box-sizing: border-box;
-  box-shadow: 0 0 0px 1px rgba(0, 0, 0, 0.06);
-  padding: 0.25rem;
-  width: 300px;
-  font-size: 14px;
-  width: 100%;
-  /* gap: 2rem; */
-  margin-bottom: 1rem;
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    border-radius: 0.5rem;
+    background-color: #ffffff;
+    box-sizing: border-box;
+    box-shadow: 0 0 0px 1px rgba(0, 0, 0, 0.06);
+    padding: 0.25rem;
+    width: 300px;
+    font-size: 14px;
+    width: 100%;
+    /* gap: 2rem; */
+    margin-bottom: 1rem;
 }
 
 .radio-inputs .radio {
-  flex: 1 1 auto;
-  text-align: center;
+    flex: 1 1 auto;
+    text-align: center;
 }
 
 .radio-inputs .radio input {
-  display: none;
+    display: none;
 }
 
 .radio-inputs .radio .name {
-  display: flex;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.5rem;
-  border: none;
-  padding: .5rem 0;
-  color: rgba(51, 65, 85, 1);
-  transition: all .15s ease-in-out;
+    display: flex;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    border: none;
+    padding: .5rem 0;
+    color: rgba(51, 65, 85, 1);
+    transition: all .15s ease-in-out;
 }
 
-.radio-inputs .radio input:checked + .name {
-  background-color: #f1f5f9;
-  font-weight: 600;
+.radio-inputs .radio input:checked+.name {
+    background-color: #f1f5f9;
+    font-weight: 600;
 }
 
 .badge-content {
@@ -208,7 +208,7 @@
 .input-group label {
     font-size: 0.875rem;
     font-weight: 600;
-     max-width: fit-content;
+    max-width: fit-content;
 }
 
 input,
@@ -223,7 +223,7 @@ select {
     transition: all 0.2s;
     color: var(--text-main);
     resize: vertical;
-    
+
 }
 
 input:focus,
@@ -243,7 +243,19 @@ select:focus {
 
 .input-with-button input {
     flex: 1;
+    width: 100%;
 }
+
+.input-with-button button {
+    padding: 0.75rem;
+    border-radius: 0.75rem;
+    border: none;
+    background: var(--accent);
+    color: white;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
 
 .input-with-icon {
     position: relative;
@@ -294,7 +306,8 @@ select:focus {
     grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
 }
-.grid-2-cols > * {
+
+.grid-2-cols>* {
     min-width: 0;
 }
 
@@ -511,6 +524,131 @@ select:focus {
 .mobileMoreImagesIndicator .dotsContainer .dot.selected {
     background: #000;
     transform: scale(1.2);
+}
+
+
+.music-select__control {
+    /* min-height: 52px !important; */
+    border-radius: 0.75rem !important;
+    border: 1px solid var(--border-color) !important;
+    background: #f1f5f9 !important;
+    box-shadow: none !important;
+    transition: all .2s ease !important;
+    padding: 2px 6px !important;
+
+}
+
+.music-select__control:hover {
+    border-color: var(--border-color) !important;
+}
+
+.music-select__control--is-focused {
+    background: #fff !important;
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.music-select__value-container {
+    padding: 2px 4px !important;
+    gap: 6px;
+}
+
+.music-select__placeholder {
+    color: #666 !important;
+    font-size: 1rem !important;
+}
+
+.music-select__input-container {
+    color: var(--text-main) !important;
+    font-size: 1rem !important;
+}
+
+.music-select__single-value {
+    color: var(--text-main) !important;
+    font-size: 1rem !important;
+}
+
+.music-select__multi-value {
+    background: #111 !important;
+    border-radius: 999px !important;
+    padding: 2px 4px !important;
+    margin: 2px !important;
+}
+
+.music-select__multi-value__label {
+    color: white !important;
+    font-size: 0.85rem !important;
+    padding: 2px 6px !important;
+}
+
+.music-select__multi-value__remove {
+    color: white !important;
+    border-radius: 999px !important;
+    transition: .2s;
+    cursor: pointer;
+}
+
+.music-select__multi-value__remove:hover {
+    background: #333 !important;
+    color: white !important;
+}
+
+.music-select__indicator-separator {
+    display: none !important;
+}
+
+.music-select__dropdown-indicator {
+    color: #666 !important;
+}
+
+.music-select__dropdown-indicator:hover {
+    color: #111 !important;
+}
+
+.music-select__menu {
+    border-radius: 0.75rem !important;
+    overflow: hidden;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .08) !important;
+    z-index: 9999 !important;
+}
+
+.music-select__menu-list {
+    padding: 0 !important;
+}
+
+.music-select__option {
+    padding: 0.85rem 1rem !important;
+    font-size: .95rem !important;
+    cursor: pointer;
+    transition: background .15s ease;
+}
+
+.music-select__option--is-focused {
+    background: #f8fafc !important;
+}
+
+.music-select__option--is-selected {
+    background: #111 !important;
+    color: white !important;
+}
+
+.buttonsForVariante{
+    display: flex;
+    gap: .2rem;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.buttonsForVariante button{
+    padding: .5rem;
+    border-radius: 5px;
+    border: none;
+    background: #000;
+    color: #fff;
+    cursor: pointer;
+    transition: background .15s ease;
+    font-size: 1rem;
 }
 
 @keyframes pulse {
